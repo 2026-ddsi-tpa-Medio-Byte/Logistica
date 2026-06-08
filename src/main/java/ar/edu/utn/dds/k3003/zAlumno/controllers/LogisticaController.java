@@ -1,0 +1,82 @@
+package ar.edu.utn.dds.k3003.zAlumno.controllers;
+
+import ar.edu.utn.dds.k3003.zAlumno.entidades.DonacionesYEntidades.DonacionYEntiDTOs;
+import ar.edu.utn.dds.k3003.zAlumno.entidades.Logistica.LogisticaDTOs;
+import ar.edu.utn.dds.k3003.zAlumno.services.LogisticaService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api")
+public class LogisticaController {
+    private final LogisticaService logisticaService;
+
+    @Autowired
+    public LogisticaController(LogisticaService logisticaService){
+        this.logisticaService = logisticaService;
+    }
+
+    @GetMapping("/depositos")
+    public ResponseEntity<List<LogisticaDTOs.DepositoDTO>> obtenerTodosDepositos() {
+        List<LogisticaDTOs.DepositoDTO> lista = logisticaService.obtenerTodosDepositosDTO();
+        if (lista.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(lista);
+    }
+
+    @GetMapping("/depositos/{id}")
+    public ResponseEntity<LogisticaDTOs.DepositoDTO> buscarDepositoPorID(@PathVariable String id) {
+        LogisticaDTOs.DepositoDTO deposito = logisticaService.buscarDepositoIDDTO(id);
+        if (deposito == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(deposito);
+    }
+
+    @PostMapping("/depositos")
+    public ResponseEntity<LogisticaDTOs.DepositoDTO> crearDeposito(@RequestBody LogisticaDTOs.DepositoDTO nuevo) {
+        LogisticaDTOs.DepositoDTO guardado = logisticaService.agregarDeposito(nuevo);
+        return ResponseEntity.status(HttpStatus.CREATED).body(guardado);
+    }
+
+    /*@PostMapping("/depositos/gestionar-donacion")
+    public ResponseEntity<LogisticaDTOs.DepositoDTO> gestionarDonacion(
+            @RequestParam String depositoid,
+            @RequestParam String donacionid,
+            @RequestParam String productoid,
+            @RequestParam Integer cantidad) {
+
+        LogisticaDTOs.DepositoDTO resultado = logisticaService.gestionarDonacion(depositoid, donacionid, productoid, cantidad);
+        return ResponseEntity.ok(resultado);
+    }*/
+
+    @GetMapping("/necesidades/{id}")
+    public ResponseEntity<DonacionYEntiDTOs.NecesidadMaterialDTO> buscarNecesidadPorID(@PathVariable String id) {
+        DonacionYEntiDTOs.NecesidadMaterialDTO necesidad = logisticaService.buscarNecesidadPorIDDTO(id);
+        if (necesidad == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(necesidad);
+    }
+
+    @GetMapping("/asignaciones/paquetes/{paqueteId}")
+    public ResponseEntity<LogisticaDTOs.AsignacionDTO> buscarAsignacionPorPaqueteID(@PathVariable String paqueteId) {
+        LogisticaDTOs.AsignacionDTO asignacion = logisticaService.buscarAsignacionPorPaqueteIDDTO(paqueteId);
+        if (asignacion == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(asignacion);
+    }
+
+    @DeleteMapping("/limpiar-base")
+    public ResponseEntity<String> limpiarBaseDeDatos() {
+        logisticaService.limpiarTodaLaBase();
+        return ResponseEntity.ok("Base de datos de Logística limpiada con éxito para la evaluación.");
+    }
+}
+
