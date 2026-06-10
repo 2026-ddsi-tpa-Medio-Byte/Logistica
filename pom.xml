@@ -98,10 +98,10 @@
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
-    <dependency>
+    <!--<dependency>
       <groupId>io.micrometer</groupId>
       <artifactId>micrometer-registry-datadog</artifactId>
-    </dependency>
+    </dependency>-->
 
   </dependencies>
 
