@@ -44,7 +44,7 @@ public class LogisticaController {
         return ResponseEntity.status(HttpStatus.CREATED).body(guardado);
     }
 
-    /*@PostMapping("/depositos/gestionar-donacion")
+    @PostMapping("/depositos/gestionar-donacion")
     public ResponseEntity<LogisticaDTOs.DepositoDTO> gestionarDonacion(
             @RequestParam String depositoid,
             @RequestParam String donacionid,
@@ -53,7 +53,7 @@ public class LogisticaController {
 
         LogisticaDTOs.DepositoDTO resultado = logisticaService.gestionarDonacion(depositoid, donacionid, productoid, cantidad);
         return ResponseEntity.ok(resultado);
-    }*/
+    }
 
     @GetMapping("/necesidades/{id}")
     public ResponseEntity<DonacionYEntiDTOs.NecesidadMaterialDTO> buscarNecesidadPorID(@PathVariable String id) {
@@ -77,6 +77,28 @@ public class LogisticaController {
     public ResponseEntity<String> limpiarBaseDeDatos() {
         logisticaService.limpiarTodaLaBase();
         return ResponseEntity.ok("Base de datos de Logística limpiada con éxito para la evaluación.");
+    }
+
+    @PutMapping("/depositos/{id}/algoritmo")
+    public ResponseEntity<String> configurarAlgoritmo(
+            @PathVariable String id,
+            @RequestParam LogisticaDTOs.TipoAlgoritmoEnum algoritmo) {
+
+        logisticaService.setAlgoritmoMM(id, algoritmo);
+
+        return ResponseEntity.ok("Algoritmo configurado correctamente.");
+    }
+
+    @PostMapping("/asignaciones/reportar-entrega")
+    public ResponseEntity<String> reportarEntregaEfectiva(@RequestBody LogisticaDTOs.PaqueteDTO paquete) {
+        try {
+            logisticaService.reportarEntrega(paquete);
+
+            return ResponseEntity.ok("Entrega registrada con éxito.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al procesar la entrega: " + e.getMessage());
+        }
     }
 }
 
