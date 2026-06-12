@@ -26,6 +26,8 @@ public class LogisticaController {
         if (lista.isEmpty()) {
             return ResponseEntity.noContent().build();
         }
+
+        meterRegistry.counter("logistica.depositos.consultas").increment();
         return ResponseEntity.ok(lista);
     }
 
@@ -52,6 +54,7 @@ public class LogisticaController {
             @RequestParam Integer cantidad) {
 
         LogisticaDTOs.DepositoDTO resultado = logisticaService.gestionarDonacion(depositoid, donacionid, productoid, cantidad);
+        meterRegistry.counter("logistica.asignaciones.creadas").increment();
         return ResponseEntity.ok(resultado);
     }
 
