@@ -5,6 +5,8 @@ import ar.edu.utn.dds.k3003.zAlumno.Interface.Algoritmos_Interface;
 import ar.edu.utn.dds.k3003.zAlumno.Interface.Donaciones_Interface;
 import ar.edu.utn.dds.k3003.zAlumno.Interface.Logistica_Interface;
 import ar.edu.utn.dds.k3003.zAlumno.MatcheoAlgoritmos;
+import ar.edu.utn.dds.k3003.zAlumno.clients.DonacionesClient;
+import ar.edu.utn.dds.k3003.zAlumno.clients.DonadoresYEntidadesClient;
 import ar.edu.utn.dds.k3003.zAlumno.entidades.Donaciones.Donacion;
 import ar.edu.utn.dds.k3003.zAlumno.entidades.DonacionesYEntidades.DonacionYEntiDTOs;
 import ar.edu.utn.dds.k3003.zAlumno.entidades.Donaciones.DonacionesDTOs;
@@ -44,6 +46,12 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
 
     @Autowired
     private NecesidadDeMaterialRepository necesidaddematerialRepository;
+
+    @Autowired
+    private DonacionesClient donacionesClient;
+
+    @Autowired
+    private DonadoresYEntidadesClient donadoresYEntidadesClient;
 
     public LogisticaService(){
 
@@ -349,6 +357,13 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         if (asignacion != null) {
             asignacion.setEstado(LogisticaDTOs.EstadoAsginacionEnum.COMPLETADA);
             asignacionRepository.save(asignacion);
+
+            // Flujo obligatorio: Logística -> Donadores y Entidades (satisfacerNecesidad)
+            try {
+                donadoresYEntidadesClient.satisfacerNecesidad(asignacion.getNecesidadId(), paquete.cantidad());
+            } catch (Exception e) {
+                System.out.println("No se pudo satisfacer la necesidad " + asignacion.getNecesidadId() + ": " + e.getMessage());
+            }
         }
 
         Donacion donacion = buscarDonacionPorID(paquete.donacionID());
@@ -356,6 +371,15 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         if (donacion != null) {
             donacion.setEstado(DonacionesDTOs.EstadoDonacionEnum.ACEPTADA);
             donacionRepository.save(donacion);
+
+            // Flujo obligatorio: Logística -> Donaciones (cambiarEstadoDeDonacion)
+            try {
+                donacionesClient.cambiarEstadoDeDonacion(
+                        donacion.getId(),
+                        ar.edu.utn.dds.k3003.catedra.dtos.donaciones.EstadoDonacionEnum.ACEPTADA);
+            } catch (Exception e) {
+                System.out.println("No se pudo cambiar el estado de la donación " + donacion.getId() + ": " + e.getMessage());
+            }
         }
     }
 
