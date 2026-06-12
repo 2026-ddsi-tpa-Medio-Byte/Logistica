@@ -3,6 +3,7 @@ package ar.edu.utn.dds.k3003.zAlumno.controllers;
 import ar.edu.utn.dds.k3003.zAlumno.entidades.DonacionesYEntidades.DonacionYEntiDTOs;
 import ar.edu.utn.dds.k3003.zAlumno.entidades.Logistica.LogisticaDTOs;
 import ar.edu.utn.dds.k3003.zAlumno.services.LogisticaService;
+import ar.edu.utn.dds.k3003.zAlumno.services.MetricasService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,21 +14,23 @@ import java.util.List;
 @RestController
 @RequestMapping("/api")
 public class LogisticaController {
+
     private final LogisticaService logisticaService;
+    private final MetricasService metricasService;
 
     @Autowired
-    public LogisticaController(LogisticaService logisticaService){
+    public LogisticaController(LogisticaService logisticaService, MetricasService metricasService) {
         this.logisticaService = logisticaService;
+        this.metricasService = metricasService;
     }
 
     @GetMapping("/depositos")
     public ResponseEntity<List<LogisticaDTOs.DepositoDTO>> obtenerTodosDepositos() {
         List<LogisticaDTOs.DepositoDTO> lista = logisticaService.obtenerTodosDepositosDTO();
+        metricasService.incrementarDepositosConsultados();
         if (lista.isEmpty()) {
             return ResponseEntity.noContent().build();
         }
-
-        meterRegistry.counter("logistica.depositos.consultas").increment();
         return ResponseEntity.ok(lista);
     }
 
@@ -53,9 +56,14 @@ public class LogisticaController {
             @RequestParam String productoid,
             @RequestParam Integer cantidad) {
 
-        LogisticaDTOs.DepositoDTO resultado = logisticaService.gestionarDonacion(depositoid, donacionid, productoid, cantidad);
-        meterRegistry.counter("logistica.asignaciones.creadas").increment();
-        return ResponseEntity.ok(resultado);
+        try {
+            LogisticaDTOs.DepositoDTO resultado = logisticaService.gestionarDonacion(depositoid, donacionid, productoid, cantidad);
+            metricasService.incrementarAsignacionesCreadas();
+            return ResponseEntity.ok(resultado);
+        } catch (Exception e) {
+            metricasService.incrementarAsignacionesErrores();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GetMapping("/necesidades/{id}")
@@ -88,7 +96,6 @@ public class LogisticaController {
             @RequestParam LogisticaDTOs.TipoAlgoritmoEnum algoritmo) {
 
         logisticaService.setAlgoritmoMM(id, algoritmo);
-
         return ResponseEntity.ok("Algoritmo configurado correctamente.");
     }
 
@@ -96,12 +103,12 @@ public class LogisticaController {
     public ResponseEntity<String> reportarEntregaEfectiva(@RequestBody LogisticaDTOs.PaqueteDTO paquete) {
         try {
             logisticaService.reportarEntrega(paquete);
-
+            metricasService.incrementarEntregasReportadas();
             return ResponseEntity.ok("Entrega registrada con éxito.");
         } catch (Exception e) {
+            metricasService.incrementarAsignacionesErrores();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al procesar la entrega: " + e.getMessage());
         }
     }
 }
-
