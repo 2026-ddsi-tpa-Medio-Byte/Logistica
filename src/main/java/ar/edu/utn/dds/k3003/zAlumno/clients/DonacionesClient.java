@@ -14,10 +14,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import ar.edu.utn.dds.k3003.catedra.fachadas.FachadaDonaciones;
 
-/**
- * Cliente HTTP hacia el módulo de Donaciones. Implementa el flujo obligatorio
- * "Logística -> Donaciones: cambiar el estado de una donación".
- */
 @Component
 public class DonacionesClient implements FachadaDonaciones {
 
