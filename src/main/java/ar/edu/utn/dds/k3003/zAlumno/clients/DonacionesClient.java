@@ -86,11 +86,9 @@ public class DonacionesClient implements FachadaDonaciones {
 
   @Override
   public void setFachadaDonadoresYEntidades(FachadaDonadoresYEntidades fachadaDonadoresYEntidades) {
-    // No aplica para el cliente HTTP
   }
 
   @Override
   public void setFachadaLogistica(FachadaLogistica fachadaLogistica) {
-    // No aplica para el cliente HTTP
   }
 }

@@ -103,8 +103,6 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         listaDepositosDTO.addAll(Arrays.asList(deposito1,deposito2,deposito3,deposito4,deposito5));
     }
 
-
-    //BUSQUEDA
     @Override
     public LogisticaDTOs.DepositoDTO buscarDepositoIDDTO(String depositoid) {
         Deposito deposito = depositoRepository.findById(depositoid).orElse(null);
@@ -242,8 +240,6 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 .collect(Collectors.toList());
     }
 
-
-    //LOGICAS
     public void setAlgoritmoMM(String depositoid, LogisticaDTOs.TipoAlgoritmoEnum algoritmo){
         Deposito deposito = buscarDepositoID(depositoid);
         deposito.setAlgoritmo(algoritmo);
@@ -304,40 +300,6 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         return buscarDepositoIDDTO(depositoid);
     }
 
-
-    /*@Override
-    public LogisticaDTOs.DepositoDTO gestionarDonacion(String depositoid,String donacionid, String productoid, Integer cantidad) {
-
-        LogisticaDTOs.PaqueteDTO paqueteMatch = new LogisticaDTOs.PaqueteDTO(
-                "paq-" + donacionid,
-                donacionid,
-                productoid,
-                cantidad
-        );
-
-        if(cantidad > 0){
-            if(listaNecesidadMaterialDTO.stream().anyMatch(n -> n.productoSolicitadoid().equals(productoid))){
-                List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNececidadesFiltradaDTO = listaNecesidadMaterialDTO.stream()
-                        .filter(n -> {
-                            NecesidadDeMaterial necesidad = buscarNecesidadPorID(n.necesidadid());
-                            return necesidad.getcantidadActual() < necesidad.getcantidadObjetivo();})
-                        .filter(n -> n.productoSolicitadoid().equals(productoid))
-                        .collect(Collectors.toList());
-
-                if(!listaNececidadesFiltradaDTO.isEmpty()){
-                LogisticaDTOs.AsignacionDTO asignacion = ejecutarMatchmaking(depositoid, paqueteMatch, listaNececidadesFiltradaDTO);
-            }
-            }
-            else{
-                System.out.println("No existe necesidad");
-            }
-        }
-        else{
-            System.out.println("Cantidad insuficiente");
-        }
-        return buscarDepositoIDDTO(depositoid);
-    }*/
-
     public LogisticaDTOs.AsignacionDTO ejecutarMatchmaking(String depositoid, LogisticaDTOs.PaqueteDTO paquete, List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadMaterialDTO){
 
         Deposito deposito = buscarDepositoID(depositoid);
@@ -372,7 +334,6 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             donacion.setEstado(DonacionesDTOs.EstadoDonacionEnum.ACEPTADA);
             donacionRepository.save(donacion);
 
-            // Flujo obligatorio: Logística -> Donaciones (cambiarEstadoDeDonacion)
             try {
                 donacionesClient.cambiarEstadoDeDonacion(
                         donacion.getId(),

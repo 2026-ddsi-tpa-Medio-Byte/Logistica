@@ -11,14 +11,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Endpoints "de cátedra" (sin prefijo /api) que permiten la integración HTTP con los
- * demás módulos. Adaptan los DTOs internos de Logística (zAlumno) a los DTOs
- * compartidos definidos por la cátedra.
- *
- * Implementa el flujo obligatorio "Donaciones -> Logística: gestionarDonacion"
- * mediante POST /asignaciones.
- */
 @RestController
 public class IntegracionLogisticaController {
 
