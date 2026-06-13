@@ -45,7 +45,6 @@ public class prioScore implements Algoritmos_Interface {
             return null;
         }
 
-        // 3. Retornamos la asignación mapeando el ID de la necesidad ganadora
         return new LogisticaDTOs.AsignacionDTO(
                 java.util.UUID.randomUUID().toString(),
                 paquete.paqueteid(),

@@ -17,11 +17,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/**
- * Cliente HTTP hacia el módulo de Donadores y Entidades. Implementa los flujos
- * obligatorios "Logística -> Donadores y Entidades": consultar necesidades
- * insatisfechas de un producto y satisfacer una necesidad material.
- */
 @Component
 public class DonadoresYEntidadesClient implements FachadaDonadoresYEntidades {
 
@@ -116,6 +111,5 @@ public class DonadoresYEntidadesClient implements FachadaDonadoresYEntidades {
 
   @Override
   public void setFachadaIncentivos(FachadaIncentivos fachadaIncentivos) {
-    // No aplica para el cliente HTTP
   }
 }
