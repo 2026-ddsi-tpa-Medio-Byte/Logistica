@@ -53,12 +53,12 @@ public class IntegracionLogisticaController {
 
   @PostMapping("/asignaciones")
   public ResponseEntity<DepositoDTO> gestionarDonacion(@RequestBody LogisticaDTOs.GestionDonacionDTO body) {
-    LogisticaDTOs.DepositoDTO resultado = logisticaService.gestionarDonacion(
+    LogisticaDTOs.GestionDonacionResponseDTO resultado = logisticaService.gestionarDonacion(
         body.depositoID(), body.donacionID(), body.productoID(), body.cantidad());
     if (resultado == null) {
       return ResponseEntity.notFound().build();
     }
-    return ResponseEntity.ok(aDepositoDTOCatedra(resultado));
+    return ResponseEntity.ok(aDepositoDTOCatedra(resultado.deposito()));
   }
 
   @GetMapping("/asignaciones/{paqueteID}")
