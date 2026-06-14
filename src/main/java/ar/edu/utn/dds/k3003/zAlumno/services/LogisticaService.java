@@ -247,7 +247,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
 
     @Transactional
     @Override
-    public LogisticaDTOs.DepositoDTO gestionarDonacion(String depositoid, String donacionid, String productoid, Integer cantidad) {
+    public LogisticaDTOs.GestionDonacionResponseDTO gestionarDonacion(String depositoid, String donacionid, String productoid, Integer cantidad) {
 
         LogisticaDTOs.PaqueteDTO paqueteMatch = new LogisticaDTOs.PaqueteDTO(
                 "paq-" + donacionid,
@@ -258,14 +258,22 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
 
         if (cantidad <= 0) {
             System.out.println("Cantidad insuficiente");
-            return buscarDepositoIDDTO(depositoid);
+            return new LogisticaDTOs.GestionDonacionResponseDTO(
+                    "Cantidad insuficiente, no se creó asignación",
+                    buscarDepositoIDDTO(depositoid),
+                    null
+            );
         }
 
         List<NecesidadDeMaterial> necesidadesDelProducto = necesidaddematerialRepository.findByProductoSolicitadoid(productoid);
 
         if (necesidadesDelProducto.isEmpty()) {
             System.out.println("No existe necesidad para el producto: " + productoid);
-            return buscarDepositoIDDTO(depositoid);
+            return new LogisticaDTOs.GestionDonacionResponseDTO(
+                    "No existe necesidad para el producto: " + productoid,
+                    buscarDepositoIDDTO(depositoid),
+                    null
+            );
         }
         List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadesFiltradaDTO = necesidadesDelProducto.stream()
                 .filter(n -> n.getcantidadActual() < n.getcantidadObjetivo())
@@ -280,8 +288,10 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 ))
                 .collect(Collectors.toList());
 
+        LogisticaDTOs.AsignacionDTO asignacion = null;
+
         if (!listaNecesidadesFiltradaDTO.isEmpty()) {
-            LogisticaDTOs.AsignacionDTO asignacion = ejecutarMatchmaking(depositoid, paqueteMatch, listaNecesidadesFiltradaDTO);
+            asignacion = ejecutarMatchmaking(depositoid, paqueteMatch, listaNecesidadesFiltradaDTO);
             if (asignacion != null) {
                 Asignacion nuevaAsignacion = new Asignacion(asignacion);
                 asignacionRepository.save(nuevaAsignacion);
@@ -297,7 +307,11 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         } else {
             System.out.println("Existen necesidades para el producto, pero todas están cubiertas (cantidad actual >= objetivo)");
         }
-        return buscarDepositoIDDTO(depositoid);
+        return new LogisticaDTOs.GestionDonacionResponseDTO(
+                asignacion != null ? "Asignación creada con éxito" : "Todas las necesidades del producto ya están cubiertas",
+                buscarDepositoIDDTO(depositoid),
+                asignacion
+        );
     }
 
     public LogisticaDTOs.AsignacionDTO ejecutarMatchmaking(String depositoid, LogisticaDTOs.PaqueteDTO paquete, List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadMaterialDTO){
@@ -312,7 +326,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         return algoritomo.ejecutarAlgoritmo(depositoid, paquete, listaNecesidadMaterialDTO);
     }
 
-    public void reportarEntrega(LogisticaDTOs.PaqueteDTO paquete) {
+    public LogisticaDTOs.ReporteEntregaResponseDTO reportarEntrega(LogisticaDTOs.PaqueteDTO paquete) {
 
         Asignacion asignacion = buscarAsignacionPorPaqueteID(paquete.paqueteid());
 
@@ -320,7 +334,6 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             asignacion.setEstado(LogisticaDTOs.EstadoAsginacionEnum.COMPLETADA);
             asignacionRepository.save(asignacion);
 
-            // Flujo obligatorio: Logística -> Donadores y Entidades (satisfacerNecesidad)
             try {
                 donadoresYEntidadesClient.satisfacerNecesidad(asignacion.getNecesidadId(), paquete.cantidad());
             } catch (Exception e) {
@@ -342,6 +355,13 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 System.out.println("No se pudo cambiar el estado de la donación " + donacion.getId() + ": " + e.getMessage());
             }
         }
+
+        return new LogisticaDTOs.ReporteEntregaResponseDTO(
+                "Donación aceptada",
+                donacion != null ? donacion.getId() : "no encontrada",
+                "Asignación completada",
+                asignacion != null ? asignacion.getId() : "no encontrada"
+        );
     }
 
     public void limpiarTodaLaBase() {

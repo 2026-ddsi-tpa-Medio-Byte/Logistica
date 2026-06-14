@@ -22,10 +22,10 @@ public interface Logistica_Interface {
      DonacionYEntiDTOs.NecesidadMaterialDTO buscarNecesidadPorIDDTO(String necesidadid);
      NecesidadDeMaterial buscarNecesidadPorID(String necesidadid);
 
-     LogisticaDTOs.DepositoDTO gestionarDonacion(String depositoid,String donacionid, String productoid, Integer cantidad);
+     LogisticaDTOs.GestionDonacionResponseDTO gestionarDonacion(String depositoid,String donacionid, String productoid, Integer cantidad);
      void setAlgoritmoMM(String depositoid, LogisticaDTOs.TipoAlgoritmoEnum algoritmo);
      LogisticaDTOs.AsignacionDTO ejecutarMatchmaking(String depositoid, LogisticaDTOs.PaqueteDTO paquete, List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadMaterialDTO);
-     void reportarEntrega(LogisticaDTOs.PaqueteDTO paquete);
+     LogisticaDTOs.ReporteEntregaResponseDTO reportarEntrega(LogisticaDTOs.PaqueteDTO paquete);
      List<LogisticaDTOs.DepositoDTO> obtenerTodosDepositosDTO();
 
      //LogisticaDTOs.AsignacionDTO buscarAsignacionPorPaqueteID(String paqueteid);

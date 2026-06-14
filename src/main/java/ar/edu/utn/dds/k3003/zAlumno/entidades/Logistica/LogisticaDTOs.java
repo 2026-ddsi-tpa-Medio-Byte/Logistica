@@ -39,6 +39,19 @@ public class LogisticaDTOs {
             EstadoAsginacionEnum estado
     ){}
 
+    public record GestionDonacionResponseDTO(
+            String mensaje,
+            DepositoDTO deposito,
+            AsignacionDTO asignacion
+    ) {}
+
+    public record ReporteEntregaResponseDTO(
+            String mensajeDonacion,
+            String donacionId,
+            String mensajeAsignacion,
+            String asignacionId
+    ) {}
+
     //SWAGGER
 
     public record DepositoBase(

@@ -50,14 +50,14 @@ public class LogisticaController {
     }
 
     @PostMapping("/depositos/gestionar-donacion")
-    public ResponseEntity<LogisticaDTOs.DepositoDTO> gestionarDonacion(
+    public ResponseEntity<LogisticaDTOs.GestionDonacionResponseDTO> gestionarDonacion(
             @RequestParam String depositoid,
             @RequestParam String donacionid,
             @RequestParam String productoid,
             @RequestParam Integer cantidad) {
 
         try {
-            LogisticaDTOs.DepositoDTO resultado = logisticaService.gestionarDonacion(depositoid, donacionid, productoid, cantidad);
+            LogisticaDTOs.GestionDonacionResponseDTO  resultado = logisticaService.gestionarDonacion(depositoid, donacionid, productoid, cantidad);
             metricasService.incrementarAsignacionesCreadas();
             return ResponseEntity.ok(resultado);
         } catch (Exception e) {
@@ -100,15 +100,19 @@ public class LogisticaController {
     }
 
     @PostMapping("/asignaciones/reportar-entrega")
-    public ResponseEntity<String> reportarEntregaEfectiva(@RequestBody LogisticaDTOs.PaqueteDTO paquete) {
+    public ResponseEntity<LogisticaDTOs.ReporteEntregaResponseDTO> reportarEntregaEfectiva(@RequestBody LogisticaDTOs.PaqueteDTO paquete) {
         try {
-            logisticaService.reportarEntrega(paquete);
+            LogisticaDTOs.ReporteEntregaResponseDTO resultado = logisticaService.reportarEntrega(paquete);
             metricasService.incrementarEntregasReportadas();
-            return ResponseEntity.ok("Entrega registrada con éxito.");
+            return ResponseEntity.ok(resultado);
         } catch (Exception e) {
             metricasService.incrementarAsignacionesErrores();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error al procesar la entrega: " + e.getMessage());
+                    .body(new LogisticaDTOs.ReporteEntregaResponseDTO(
+                            "Error al procesar la entrega: " + e.getMessage(),
+                            null,
+                            null,
+                            null));
         }
     }
 }
