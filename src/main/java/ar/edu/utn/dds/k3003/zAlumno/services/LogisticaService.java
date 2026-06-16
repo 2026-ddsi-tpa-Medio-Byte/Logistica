@@ -128,10 +128,29 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
 
     @Override
     public LogisticaDTOs.DepositoDTO agregarDeposito(LogisticaDTOs.DepositoDTO depositoDTO) {
+        String id = (depositoDTO.depositoid() != null && !depositoDTO.depositoid().isBlank())
+                ? depositoDTO.depositoid()
+                : java.util.UUID.randomUUID().toString();
+
+        LogisticaDTOs.DepositoDTO dtoConId = new LogisticaDTOs.DepositoDTO(
+                depositoDTO.nombre(),
+                id,
+                depositoDTO.direccion(),
+                depositoDTO.capacidadMaxima(),
+                depositoDTO.stockActual() != null ? depositoDTO.stockActual() : 0,
+                depositoDTO.algoritmo()
+        );
+
+        Deposito deposito = new Deposito(dtoConId);
+        depositoRepository.save(deposito);
+        return buscarDepositoIDDTO(id);
+    }
+
+    /*public LogisticaDTOs.DepositoDTO agregarDeposito(LogisticaDTOs.DepositoDTO depositoDTO) {
         Deposito deposito = new Deposito(depositoDTO);
         Deposito guardado = depositoRepository.save(deposito);
         return buscarDepositoIDDTO(guardado.getId());
-    }
+    }*/
 
     @Override
     public void eliminarDeposito(String depositoid) {
@@ -329,6 +348,46 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
     public LogisticaDTOs.ReporteEntregaResponseDTO reportarEntrega(LogisticaDTOs.PaqueteDTO paquete) {
 
         Asignacion asignacion = buscarAsignacionPorPaqueteID(paquete.paqueteid());
+        if (asignacion == null) {
+            throw new RuntimeException("No existe asignación para el paquete: " + paquete.paqueteid());
+        }
+
+        Donacion donacion = buscarDonacionPorID(paquete.donacionID());
+        if (donacion == null) {
+            throw new RuntimeException("No existe donación con id: " + paquete.donacionID());
+        }
+
+        asignacion.setEstado(LogisticaDTOs.EstadoAsginacionEnum.COMPLETADA);
+        asignacionRepository.save(asignacion);
+
+        try {
+            donadoresYEntidadesClient.satisfacerNecesidad(asignacion.getNecesidadId(), paquete.cantidad());
+        } catch (Exception e) {
+            System.out.println("No se pudo satisfacer la necesidad " + asignacion.getNecesidadId() + ": " + e.getMessage());
+        }
+
+        donacion.setEstado(DonacionesDTOs.EstadoDonacionEnum.ACEPTADA);
+        donacionRepository.save(donacion);
+
+        try {
+            donacionesClient.cambiarEstadoDeDonacion(
+                    donacion.getId(),
+                    ar.edu.utn.dds.k3003.catedra.dtos.donaciones.EstadoDonacionEnum.ACEPTADA);
+        } catch (Exception e) {
+            System.out.println("No se pudo cambiar el estado de la donación " + donacion.getId() + ": " + e.getMessage());
+        }
+
+        return new LogisticaDTOs.ReporteEntregaResponseDTO(
+                "Donación aceptada",
+                donacion.getId(),
+                "Asignación completada",
+                asignacion.getId()
+        );
+    }
+
+    /*public LogisticaDTOs.ReporteEntregaResponseDTO reportarEntrega(LogisticaDTOs.PaqueteDTO paquete) {
+
+        Asignacion asignacion = buscarAsignacionPorPaqueteID(paquete.paqueteid());
 
         if (asignacion != null) {
             asignacion.setEstado(LogisticaDTOs.EstadoAsginacionEnum.COMPLETADA);
@@ -362,7 +421,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 "Asignación completada",
                 asignacion != null ? asignacion.getId() : "no encontrada"
         );
-    }
+    }*/
 
     public void limpiarTodaLaBase() {
         asignacionRepository.deleteAll();
