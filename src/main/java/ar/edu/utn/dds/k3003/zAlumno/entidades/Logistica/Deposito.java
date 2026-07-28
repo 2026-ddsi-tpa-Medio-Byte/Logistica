@@ -37,4 +37,8 @@ public class Deposito {
     public String getDireccion() { return direccion; }
     public Integer getCapacidadMaxima() { return capacidadMaxima; }
     public Integer getStockActual() { return stockActual; }
+    public void setStockActual(Integer stockactual) { this.stockActual = stockactual; }
+    public void agregarAlStock(Integer cantidad) { this.stockActual = this.stockActual + cantidad; }
+    public boolean estaLleno() { return stockActual >= capacidadMaxima; }
+    public int espacioDisponible() { return capacidadMaxima - stockActual; }
 }

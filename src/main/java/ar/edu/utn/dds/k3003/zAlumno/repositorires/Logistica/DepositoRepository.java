@@ -6,4 +6,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface DepositoRepository extends JpaRepository<Deposito, String> {
+    long countByDepositoidStartingWith(String prefix);
 }
