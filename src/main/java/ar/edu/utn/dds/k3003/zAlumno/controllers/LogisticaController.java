@@ -4,6 +4,7 @@ import ar.edu.utn.dds.k3003.zAlumno.entidades.DonacionesYEntidades.DonacionYEnti
 import ar.edu.utn.dds.k3003.zAlumno.entidades.Logistica.LogisticaDTOs;
 import ar.edu.utn.dds.k3003.zAlumno.services.LogisticaService;
 import ar.edu.utn.dds.k3003.zAlumno.services.MetricasService;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,7 @@ public class LogisticaController {
         this.metricasService = metricasService;
     }
 
+    @Operation(summary = "Muestra todos los depósitos")
     @GetMapping("/depositos")
     public ResponseEntity<List<LogisticaDTOs.DepositoDTO>> obtenerTodosDepositos() {
         List<LogisticaDTOs.DepositoDTO> lista = logisticaService.obtenerTodosDepositosDTO();
@@ -34,6 +36,7 @@ public class LogisticaController {
         return ResponseEntity.ok(lista);
     }
 
+    @Operation(summary = "Muestra depósito por ID")
     @GetMapping("/depositos/{id}")
     public ResponseEntity<LogisticaDTOs.DepositoDTO> buscarDepositoPorID(@PathVariable String id) {
         LogisticaDTOs.DepositoDTO deposito = logisticaService.buscarDepositoIDDTO(id);
@@ -43,12 +46,14 @@ public class LogisticaController {
         return ResponseEntity.ok(deposito);
     }
 
+    @Operation(summary = "Crea un nuevo depósito")
     @PostMapping("/depositos")
     public ResponseEntity<LogisticaDTOs.DepositoDTO> crearDeposito(@RequestBody LogisticaDTOs.DepositoDTO nuevo) {
         LogisticaDTOs.DepositoDTO guardado = logisticaService.agregarDeposito(nuevo);
         return ResponseEntity.status(HttpStatus.CREATED).body(guardado);
     }
 
+    @Operation(summary = "Gestiona una donación y la asigna a una necesidad")
     @PostMapping("/depositos/gestionar-donacion")
     public ResponseEntity<LogisticaDTOs.GestionDonacionResponseDTO> gestionarDonacion(
             @RequestParam String depositoid,
@@ -75,6 +80,7 @@ public class LogisticaController {
         return ResponseEntity.ok(necesidad);
     }
 
+    @Operation(summary = "Busca una asignación por ID de paquete")
     @GetMapping("/asignaciones/paquetes/{paqueteId}")
     public ResponseEntity<LogisticaDTOs.AsignacionDTO> buscarAsignacionPorPaqueteID(@PathVariable String paqueteId) {
         LogisticaDTOs.AsignacionDTO asignacion = logisticaService.buscarAsignacionPorPaqueteIDDTO(paqueteId);
@@ -84,12 +90,14 @@ public class LogisticaController {
         return ResponseEntity.ok(asignacion);
     }
 
+    @Operation(summary = "Limpia toda la base de datos")
     @DeleteMapping("/limpiar-base")
     public ResponseEntity<String> limpiarBaseDeDatos() {
         logisticaService.limpiarTodaLaBase();
         return ResponseEntity.ok("Base de datos de Logística limpiada con éxito para la evaluación.");
     }
 
+    @Operation(summary = "Configura el algoritmo de matchmaking de un depósito")
     @PutMapping("/depositos/{id}/algoritmo")
     public ResponseEntity<String> configurarAlgoritmo(
             @PathVariable String id,
@@ -99,6 +107,7 @@ public class LogisticaController {
         return ResponseEntity.ok("Algoritmo configurado correctamente.");
     }
 
+    @Operation(summary = "Reporta la entrega efectiva de un paquete")
     @PostMapping("/asignaciones/reportar-entrega")
     public ResponseEntity<LogisticaDTOs.ReporteEntregaResponseDTO> reportarEntregaEfectiva(@RequestBody LogisticaDTOs.PaqueteDTO paquete) {
         try {

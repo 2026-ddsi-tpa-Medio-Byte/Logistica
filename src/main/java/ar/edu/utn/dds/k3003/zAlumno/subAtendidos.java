@@ -11,40 +11,29 @@ import java.util.List;
 
 public class subAtendidos implements Algoritmos_Interface {
 
-    private final NecesidadDeMaterialRepository necesidadRepository;
-
-    public subAtendidos(NecesidadDeMaterialRepository necesidadRepository) {
-        this.necesidadRepository = necesidadRepository;
-    }
-
     @Override
-    public LogisticaDTOs.AsignacionDTO ejecutarAlgoritmo(String depositoid, LogisticaDTOs.PaqueteDTO paquete, List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadMaterialDTO) {
+    public LogisticaDTOs.AsignacionDTO ejecutarAlgoritmo(
+            String depositoid,
+            LogisticaDTOs.PaqueteDTO paquete,
+            List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadMaterialDTO) {
 
         DonacionYEntiDTOs.NecesidadMaterialDTO dtoElegido = null;
         double menorPorcentaje = 101.0;
 
         for (DonacionYEntiDTOs.NecesidadMaterialDTO dto : listaNecesidadMaterialDTO) {
-
-            NecesidadDeMaterial necesidad = necesidadRepository.findById(dto.necesidadid()).orElse(null);
-
-            if (necesidad != null) {
-                double porcentajeActual = (necesidad.getcantidadActual() * 100.0) / necesidad.getcantidadObjetivo();
-
-                if (porcentajeActual < menorPorcentaje) {
-                    menorPorcentaje = porcentajeActual;
-                    dtoElegido = dto;
-                }
+            double porcentajeActual = (dto.cantidadActual() * 100.0) / dto.cantidadObjetivo();
+            if (porcentajeActual < menorPorcentaje) {
+                menorPorcentaje = porcentajeActual;
+                dtoElegido = dto;
             }
         }
 
-        if (dtoElegido == null) {
-            return null;
-        }
+        if (dtoElegido == null) return null;
 
         return new LogisticaDTOs.AsignacionDTO(
                 java.util.UUID.randomUUID().toString(),
                 paquete.paqueteid(),
-                dtoElegido.necesidadid(),
+                dtoElegido.necesidadid(),      // ← necesidadid() no id()
                 LocalDateTime.now(),
                 LogisticaDTOs.EstadoAsginacionEnum.ASIGNADA
         );

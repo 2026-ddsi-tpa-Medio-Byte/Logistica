@@ -6,7 +6,10 @@ import ar.edu.utn.dds.k3003.zAlumno.entidades.Logistica.LogisticaDTOs;
 import java.util.List;
 
 public interface Algoritmos_Interface {
-
-    LogisticaDTOs.AsignacionDTO ejecutarAlgoritmo(String depositoid, LogisticaDTOs.PaqueteDTO paquete, List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadMaterialDTO);
+    LogisticaDTOs.AsignacionDTO ejecutarAlgoritmo(
+            String depositoid,
+            LogisticaDTOs.PaqueteDTO paquete,
+            List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadMaterialDTO
+    );
 }
 

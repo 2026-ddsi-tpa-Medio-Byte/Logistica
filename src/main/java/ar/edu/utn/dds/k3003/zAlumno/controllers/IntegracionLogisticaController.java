@@ -6,6 +6,8 @@ import ar.edu.utn.dds.k3003.catedra.dtos.logistica.TipoAlgoritmoEnum;
 import ar.edu.utn.dds.k3003.zAlumno.entidades.Logistica.LogisticaDTOs;
 import ar.edu.utn.dds.k3003.zAlumno.services.LogisticaService;
 import java.util.List;
+
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ public class IntegracionLogisticaController {
     this.logisticaService = logisticaService;
   }
 
+  @Operation(summary = "Crea un depósito desde otro módulo")
   @PostMapping("/depositos")
   public ResponseEntity<DepositoDTO> crearDeposito(@RequestBody DepositoDTO depositoDTO) {
     LogisticaDTOs.DepositoDTO nuevo = new LogisticaDTOs.DepositoDTO(
@@ -34,6 +37,7 @@ public class IntegracionLogisticaController {
     return ResponseEntity.status(HttpStatus.CREATED).body(aDepositoDTOCatedra(guardado));
   }
 
+  @Operation(summary = "Obtiene todos los depósitos")
   @GetMapping("/depositos")
   public ResponseEntity<List<DepositoDTO>> obtenerDepositos() {
     List<DepositoDTO> depositos = logisticaService.obtenerTodosDepositosDTO().stream()
@@ -42,6 +46,7 @@ public class IntegracionLogisticaController {
     return ResponseEntity.ok(depositos);
   }
 
+  @Operation(summary = "Obtiene un depósito por ID")
   @GetMapping("/depositos/{id}")
   public ResponseEntity<DepositoDTO> buscarDepositoPorID(@PathVariable String id) {
     LogisticaDTOs.DepositoDTO deposito = logisticaService.buscarDepositoIDDTO(id);
@@ -51,6 +56,7 @@ public class IntegracionLogisticaController {
     return ResponseEntity.ok(aDepositoDTOCatedra(deposito));
   }
 
+  @Operation(summary = "Recibe una donación desde el módulo Donaciones")
   @PostMapping("/asignaciones")
   public ResponseEntity<DepositoDTO> gestionarDonacion(@RequestBody LogisticaDTOs.GestionDonacionDTO body) {
     LogisticaDTOs.GestionDonacionResponseDTO resultado = logisticaService.gestionarDonacion(
@@ -61,6 +67,7 @@ public class IntegracionLogisticaController {
     return ResponseEntity.ok(aDepositoDTOCatedra(resultado.deposito()));
   }
 
+  @Operation(summary = "Obtiene una asignación por ID de paquete")
   @GetMapping("/asignaciones/{paqueteID}")
   public ResponseEntity<AsignacionDTO> buscarAsignacionPorPaqueteID(@PathVariable String paqueteID) {
     LogisticaDTOs.AsignacionDTO asignacion = logisticaService.buscarAsignacionPorPaqueteIDDTO(paqueteID);

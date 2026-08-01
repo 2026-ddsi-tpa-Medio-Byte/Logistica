@@ -30,6 +30,7 @@ public class DonacionYEntiDTOs {
             Integer nivelDeUrgencia,
             String descripcion,
             Integer cantidadObjetivo,
+            Integer cantidadActual,
             String productoSolicitadoid,
             TipoNecesidadMaterialEnum tipo
     ) {}

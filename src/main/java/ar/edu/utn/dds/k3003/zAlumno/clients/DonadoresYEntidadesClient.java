@@ -40,6 +40,46 @@ public class DonadoresYEntidadesClient implements FachadaDonadoresYEntidades {
     return necesidades != null ? Arrays.asList(necesidades) : List.of();
   }
 
+  public List<ar.edu.utn.dds.k3003.zAlumno.entidades.DonacionesYEntidades.DonacionYEntiDTOs.NecesidadMaterialDTO>
+  obtenerNecesidadesConCantidad(String productoSolicitadoID) {
+
+    String url =
+            UriComponentsBuilder.fromUriString(baseUrl + "/necesidades")
+                    .queryParam("productoID", productoSolicitadoID)
+                    .toUriString();
+
+    ar.edu.utn.dds.k3003.zAlumno.entidades.DonacionesYEntidades.NecesidadResponseDTO[] respuesta =
+            restTemplate.getForObject(
+                    url,
+                    ar.edu.utn.dds.k3003.zAlumno.entidades.DonacionesYEntidades.NecesidadResponseDTO[].class);
+
+    if (respuesta == null) {
+      return List.of();
+    }
+
+    return Arrays.stream(respuesta)
+            .map(n -> new ar.edu.utn.dds.k3003.zAlumno.entidades.DonacionesYEntidades.DonacionYEntiDTOs.NecesidadMaterialDTO(
+                    n.id(),
+                    n.entidadID(),
+                    n.nivelDeUrgencia(),
+                    n.descripcion(),
+                    n.cantidadObjetivo(),
+                    n.cantidadActual() != null ? n.cantidadActual() : 0,
+                    n.productoSolicitadoID(),
+                    mapearTipo(n.tipo())
+            ))
+            .toList();
+  }
+
+  private ar.edu.utn.dds.k3003.zAlumno.entidades.DonacionesYEntidades.DonacionYEntiDTOs.TipoNecesidadMaterialEnum
+  mapearTipo(String tipo) {
+    if (tipo == null) {
+      return ar.edu.utn.dds.k3003.zAlumno.entidades.DonacionesYEntidades.DonacionYEntiDTOs.TipoNecesidadMaterialEnum.RECURRENTE;
+    }
+    return ar.edu.utn.dds.k3003.zAlumno.entidades.DonacionesYEntidades.DonacionYEntiDTOs.TipoNecesidadMaterialEnum
+            .valueOf(tipo.toUpperCase());
+  }
+
   @Override
   public NecesidadMaterialDTO satisfacerNecesidad(String necesidadID, Integer cantidad)
       throws NoSuchElementException {

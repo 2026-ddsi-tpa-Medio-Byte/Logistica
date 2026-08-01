@@ -26,6 +26,7 @@ public interface Logistica_Interface {
      LogisticaDTOs.GestionDonacionResponseDTO gestionarDonacion(String depositoid,String donacionid, String productoid, Integer cantidad);
      void setAlgoritmoMM(String depositoid, LogisticaDTOs.TipoAlgoritmoEnum algoritmo);
      LogisticaDTOs.AsignacionDTO ejecutarMatchmaking(String depositoid, LogisticaDTOs.PaqueteDTO paquete, List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadMaterialDTO);
+     //LogisticaDTOs.AsignacionDTO ejecutarMatchmaking(String depositoid, LogisticaDTOs.PaqueteDTO paquete, List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadMaterialDTO);
      LogisticaDTOs.ReporteEntregaResponseDTO reportarEntrega(LogisticaDTOs.PaqueteDTO paquete);
      List<LogisticaDTOs.DepositoDTO> obtenerTodosDepositosDTO();
 

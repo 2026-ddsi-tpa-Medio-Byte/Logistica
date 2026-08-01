@@ -190,6 +190,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 necesidad.getNivelDeUrgencia(),
                 necesidad.getDescripcion(),
                 necesidad.getcantidadObjetivo(),
+                necesidad.getcantidadActual(),
                 necesidad.getproductoSolicitadoid(),
                 necesidad.getTipo()
 
@@ -269,7 +270,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         Deposito deposito = buscarDepositoID(depositoId);
 
         if(deposito.estaLleno()){
-            System.out.println("Deposito lleno, no se pudo agregar el stock");
+            System.out.println("Deposito lleno, se descarto el sobrante");
         }
 
         if(!deposito.estaLleno()){
@@ -283,7 +284,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             else{
                 deposito.agregarAlStock(espacio);
                 depositoRepository.save(deposito);
-                System.out.println("Producto guardado en deposito sobrante desechado");
+                System.out.println("Producto guardado en deposito sobrante descartado");
             }
         }
     }
@@ -291,6 +292,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
     public void setAlgoritmoMM(String depositoid, LogisticaDTOs.TipoAlgoritmoEnum algoritmo){
         Deposito deposito = buscarDepositoID(depositoid);
         deposito.setAlgoritmo(algoritmo);
+        depositoRepository.save(deposito);
     }
 
     @Transactional
@@ -326,10 +328,11 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                     null);
         }
 
-        List<NecesidadDeMaterial> necesidadesDelProducto = necesidaddematerialRepository.findByProductoSolicitadoid(productoid);
+        List<DonacionYEntiDTOs.NecesidadMaterialDTO> necesidadesDelProducto =
+                donadoresYEntidadesClient.obtenerNecesidadesConCantidad(productoid);
 
         //verifica existencia de necesidades para producto especifico
-        if (necesidadesDelProducto.isEmpty()) {
+        if (necesidadesDelProducto == null || necesidadesDelProducto.isEmpty()) {
 
             //NO NECESIDADES Y DEPOSITO LLENO
             if(deposito.getStockActual() >= deposito.getCapacidadMaxima()){
@@ -350,24 +353,14 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         }
 
         //verifica existencia de necesidades, filtra las insatisfechas y filtra las recurrentes insuficientes
-        List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadesFiltradaDTO = necesidadesDelProducto.stream()
-                .filter(n -> n.getcantidadActual() < n.getcantidadObjetivo())
-                .filter(n -> {
-                    int cantidadNecesaria = n.getcantidadObjetivo() - n.getcantidadActual();
-                    boolean noAlcanza = cantidad < cantidadNecesaria;
-                    boolean esRecurrente = n.getTipo() == DonacionYEntiDTOs.TipoNecesidadMaterialEnum.RECURRENTE;
-                    return !(noAlcanza && esRecurrente);
-                })
-                .map(n -> new DonacionYEntiDTOs.NecesidadMaterialDTO(
-                        n.getId(),
-                        n.getEntidadid(),
-                        n.getNivelDeUrgencia(),
-                        n.getDescripcion(),
-                        n.getcantidadObjetivo(),
-                        n.getproductoSolicitadoid(),
-                        n.getTipo()
-                ))
-                .collect(Collectors.toList());
+        List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadesFiltradaDTO =
+                necesidadesDelProducto.stream()
+                        .filter(n -> {
+                            boolean noAlcanza = cantidad < (n.cantidadObjetivo() - n.cantidadActual());
+                            boolean esRecurrente = n.tipo() == DonacionYEntiDTOs.TipoNecesidadMaterialEnum.RECURRENTE;
+                            return !(noAlcanza && esRecurrente);
+                        })
+                        .collect(Collectors.toList());
 
         LogisticaDTOs.AsignacionDTO asignacion = null;
 
@@ -377,15 +370,69 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 Asignacion nuevaAsignacion = new Asignacion(asignacion);
                 asignacionRepository.save(nuevaAsignacion);
 
-                NecesidadDeMaterial necesidadElegida = necesidaddematerialRepository.findById(asignacion.necesidadid()).orElse(null);
+                final String necesidadIdBuscada = asignacion.necesidadid();
+
+                DonacionYEntiDTOs.NecesidadMaterialDTO necesidadElegida =
+                        necesidadesDelProducto.stream()
+                                .filter(n -> n.necesidadid().equals(necesidadIdBuscada))
+                                .findFirst()
+                                .orElse(null);
 
                 if (necesidadElegida != null) {
 
+                    int cantidadNecesaria = necesidadElegida.cantidadObjetivo() - necesidadElegida.cantidadActual();
+
+                    // caso: donación exacta o suficiente
+                    if (cantidad >= cantidadNecesaria) {
+                        int sobrante = cantidad - cantidadNecesaria;
+
+                        if (sobrante > 0) {
+                            if (!deposito.estaLleno()) {
+                                agregarAlStock(depositoid, sobrante);
+                                System.out.println("Asignación creada con éxito. Sobrante de " + sobrante + " guardado en stock");
+                                return new LogisticaDTOs.GestionDonacionResponseDTO(
+                                        "Asignación creada con éxito. Sobrante de " + sobrante + " unidades guardado en stock",
+                                        buscarDepositoIDDTO(depositoid),
+                                        asignacion
+                                );
+                            } else {
+                                System.out.println("Asignación creada con éxito. Sobrante descartado: depósito lleno");
+                                return new LogisticaDTOs.GestionDonacionResponseDTO(
+                                        "Asignación creada con éxito. Sobrante de " + sobrante + " unidades descartado: depósito lleno",
+                                        buscarDepositoIDDTO(depositoid),
+                                        asignacion
+                                );
+                            }
+                        }
+
+                        System.out.println("Asignación creada con éxito. Sin sobrante");
+                        return new LogisticaDTOs.GestionDonacionResponseDTO(
+                                "Asignación creada con éxito. Sin sobrante",
+                                buscarDepositoIDDTO(depositoid),
+                                asignacion
+                        );
+                    }
+
+                    // caso: donación insuficiente
+                    if (cantidad < cantidadNecesaria) {
+                        if (necesidadElegida.tipo() == DonacionYEntiDTOs.TipoNecesidadMaterialEnum.EXTRAORDINARIA) {
+                            System.out.println("Asignación creada con éxito. Necesidad EXTRAORDINARIA, cantidad insuficiente pero se asigna igual");
+                            return new LogisticaDTOs.GestionDonacionResponseDTO(
+                                    "Asignación creada con éxito. Necesidad extraordinaria cubierta parcialmente",
+                                    buscarDepositoIDDTO(depositoid),
+                                    asignacion
+                            );
+                        }
+                    }
+                }
+
+                /*if (necesidadElegida != null) {
+
                     //caso: cant. actual + donacion = cant. objetivo
-                    if(necesidadElegida.getcantidadActual() + cantidad == necesidadElegida.getcantidadObjetivo()) {
-                        int nuevoProgreso = necesidadElegida.getcantidadActual() + cantidad;
+                    if(necesidadElegida.cantidadActual() + cantidad == necesidadElegida.cantidadObjetivo()) {
+                        int nuevoProgreso = necesidadElegida.cantidadActual() + cantidad;
                         necesidadElegida.setcantidadActual(nuevoProgreso);
-                        necesidaddematerialRepository.save(necesidadElegida);
+                        //necesidaddematerialRepository.save(necesidadElegida);
                         System.out.println("Asignación guardada y necesidad actualizada con éxito. No hubo sobrante");
                         return new LogisticaDTOs.GestionDonacionResponseDTO(
                                 "Asignación guardada y necesidad actualizada con éxito. No hubo sobrante",
@@ -428,7 +475,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                             );
                         }
                     }
-                }
+                }*/
             }
         } else {
             System.out.println("Existen necesidades para el producto, pero todas están cubiertas (cantidad actual >= objetivo)");
@@ -453,7 +500,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             throw new RuntimeException("No se pudo ejecutar el matchmaking: El depósito no existe.");
         }
         LogisticaDTOs.TipoAlgoritmoEnum algoritmoConfigurado = deposito.getAlgoritmo();
-        Algoritmos_Interface algoritomo = MatcheoAlgoritmos.seleccionAlgoritmo(algoritmoConfigurado, necesidaddematerialRepository);
+        Algoritmos_Interface algoritomo = MatcheoAlgoritmos.seleccionAlgoritmo(algoritmoConfigurado);
 
         return algoritomo.ejecutarAlgoritmo(depositoid, paquete, listaNecesidadMaterialDTO);
     }
