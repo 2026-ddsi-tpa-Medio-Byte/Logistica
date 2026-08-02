@@ -425,57 +425,6 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                         }
                     }
                 }
-
-                /*if (necesidadElegida != null) {
-
-                    //caso: cant. actual + donacion = cant. objetivo
-                    if(necesidadElegida.cantidadActual() + cantidad == necesidadElegida.cantidadObjetivo()) {
-                        int nuevoProgreso = necesidadElegida.cantidadActual() + cantidad;
-                        necesidadElegida.setcantidadActual(nuevoProgreso);
-                        //necesidaddematerialRepository.save(necesidadElegida);
-                        System.out.println("Asignación guardada y necesidad actualizada con éxito. No hubo sobrante");
-                        return new LogisticaDTOs.GestionDonacionResponseDTO(
-                                "Asignación guardada y necesidad actualizada con éxito. No hubo sobrante",
-                                buscarDepositoIDDTO(depositoid),
-                                asignacion
-                        );
-                    }
-
-                    //caso: cantidad prodcuto suficiente
-                    if(necesidadElegida.getcantidadActual() + cantidad > necesidadElegida.getcantidadObjetivo()){
-
-                        if(!deposito.estaLleno()){
-                            int sobrante = necesidadElegida.getcantidadActual() + cantidad - necesidadElegida.getcantidadObjetivo();
-                            int nuevoProgreso = necesidadElegida.getcantidadActual() + cantidad;
-                            necesidadElegida.setcantidadActual(nuevoProgreso - sobrante);
-                            necesidaddematerialRepository.save(necesidadElegida);
-                            System.out.println("Asignación guardada y necesidad actualizada con éxito. Hubo sobrante");
-                            agregarAlStock(depositoid, sobrante);
-                            return new LogisticaDTOs.GestionDonacionResponseDTO(
-                                    "Asignación guardada y necesidad actualizada con éxito. Hubo sobrante",
-                                    buscarDepositoIDDTO(depositoid),
-                                    asignacion
-                            );
-                        }
-                    }
-
-                    //caso: cantidad prodcuto insuficiente
-                    if(necesidadElegida.getcantidadActual() + cantidad < necesidadElegida.getcantidadObjetivo()){
-
-                        if(necesidadElegida.getTipo() == DonacionYEntiDTOs.TipoNecesidadMaterialEnum.EXTRAORDINARIA){
-
-                            int nuevoProgreso = necesidadElegida.getcantidadActual() + cantidad;
-                            necesidadElegida.setcantidadActual(nuevoProgreso);
-                            necesidaddematerialRepository.save(necesidadElegida);
-                            System.out.println("Asignación guardada y necesidad actualizada con éxito.");
-                            return new LogisticaDTOs.GestionDonacionResponseDTO(
-                                    "Asignación guardada y necesidad actualizada con éxito.",
-                                    buscarDepositoIDDTO(depositoid),
-                                    asignacion
-                            );
-                        }
-                    }
-                }*/
             }
         } else {
             System.out.println("Existen necesidades para el producto, pero todas están cubiertas (cantidad actual >= objetivo)");
@@ -512,11 +461,6 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             throw new RuntimeException("No existe asignación para el paquete: " + paquete.paqueteid());
         }
 
-        Donacion donacion = buscarDonacionPorID(paquete.donacionID());
-        if (donacion == null) {
-            throw new RuntimeException("No existe donación con id: " + paquete.donacionID());
-        }
-
         asignacion.setEstado(LogisticaDTOs.EstadoAsginacionEnum.COMPLETADA);
         asignacionRepository.save(asignacion);
 
@@ -526,20 +470,17 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             System.out.println("No se pudo satisfacer la necesidad " + asignacion.getNecesidadId() + ": " + e.getMessage());
         }
 
-        donacion.setEstado(DonacionesDTOs.EstadoDonacionEnum.ACEPTADA);
-        donacionRepository.save(donacion);
-
         try {
             donacionesClient.cambiarEstadoDeDonacion(
-                    donacion.getId(),
+                    paquete.donacionID(),
                     ar.edu.utn.dds.k3003.catedra.dtos.donaciones.EstadoDonacionEnum.ACEPTADA);
         } catch (Exception e) {
-            System.out.println("No se pudo cambiar el estado de la donación " + donacion.getId() + ": " + e.getMessage());
+            System.out.println("No se pudo cambiar el estado de la donación " + paquete.donacionID() + ": " + e.getMessage());
         }
 
         return new LogisticaDTOs.ReporteEntregaResponseDTO(
                 "Donación aceptada",
-                donacion.getId(),
+                paquete.donacionID(),
                 "Asignación completada",
                 asignacion.getId()
         );
