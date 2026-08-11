@@ -107,6 +107,13 @@ public class LogisticaController {
         return ResponseEntity.ok("Algoritmo configurado correctamente.");
     }
 
+    @Operation(summary = "Da de alta una asignación calculada por un worker")
+    @PostMapping("/asignaciones/alta")
+    public ResponseEntity<LogisticaDTOs.AsignacionDTO> altaAsignacion(@RequestBody LogisticaDTOs.AsignacionDTO asignacionDTO) {
+        LogisticaDTOs.AsignacionDTO guardada = logisticaService.altaAsignacion(asignacionDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(guardada);
+    }
+
     @Operation(summary = "Reporta la entrega efectiva de un paquete")
     @PostMapping("/asignaciones/reportar-entrega")
     public ResponseEntity<LogisticaDTOs.ReporteEntregaResponseDTO> reportarEntregaEfectiva(@RequestBody LogisticaDTOs.PaqueteDTO paquete) {
