@@ -21,7 +21,7 @@ public interface Logistica_Interface {
      LogisticaDTOs.DepositoDTO modificarDeposito(String id, LogisticaDTOs.DepositoDTO nuevosDatos);
      DonacionYEntiDTOs.NecesidadMaterialDTO buscarNecesidadPorIDDTO(String necesidadid);
      NecesidadDeMaterial buscarNecesidadPorID(String necesidadid);
-     void agregarAlStock(String depositoId, Integer cantidad);
+     void agregarAlStock(String depositoId, String productoId, Integer cantidad);
 
      LogisticaDTOs.GestionDonacionResponseDTO gestionarDonacion(String depositoid,String donacionid, String productoid, Integer cantidad);
      void setAlgoritmoMM(String depositoid, LogisticaDTOs.TipoAlgoritmoEnum algoritmo);

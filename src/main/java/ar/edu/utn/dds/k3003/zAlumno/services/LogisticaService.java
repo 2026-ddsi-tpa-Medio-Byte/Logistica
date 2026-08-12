@@ -20,6 +20,8 @@ import ar.edu.utn.dds.k3003.zAlumno.repositorires.Donaciones.DonacionRepository;
 import ar.edu.utn.dds.k3003.zAlumno.repositorires.DonacionesYEntidades.NecesidadDeMaterialRepository;
 import ar.edu.utn.dds.k3003.zAlumno.repositorires.Logistica.AsignacionRepository;
 import ar.edu.utn.dds.k3003.zAlumno.repositorires.Logistica.DepositoRepository;
+import ar.edu.utn.dds.k3003.zAlumno.repositorires.Logistica.StockDepositoRepository;
+import ar.edu.utn.dds.k3003.zAlumno.entidades.Logistica.StockDeposito;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -49,6 +51,9 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
 
     @Autowired
     private NecesidadDeMaterialRepository necesidaddematerialRepository;
+
+    @Autowired
+    private StockDepositoRepository stockDepositoRepository;
 
     @Autowired
     private DonacionesClient donacionesClient;
@@ -215,7 +220,8 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 asig.getpaqueteId(),
                 asig.getNecesidadId(),
                 asig.getfecha(),
-                asig.getEstado()
+                asig.getEstado(),
+                asig.getOrigen()
         );
     }
 
@@ -264,8 +270,28 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 .collect(Collectors.toList());
     }
 
+    private void descontarStock(String productoID, Integer cantidad) {
+        List<StockDeposito> stocks = stockDepositoRepository.findByProductoid(productoID);
+        int restante = cantidad;
+
+        for (StockDeposito stock : stocks) {
+            if (restante <= 0) break;
+
+            int aDescontar = Math.min(stock.getCantidad(), restante);
+            stock.setCantidad(stock.getCantidad() - aDescontar);
+            stockDepositoRepository.save(stock);
+
+            // actualiza el depósito
+            Deposito deposito = buscarDepositoID(stock.getDepositoid());
+            deposito.setStockActual(deposito.getStockActual() - aDescontar);
+            depositoRepository.save(deposito);
+
+            restante -= aDescontar;
+        }
+    }
+
     @Override
-    public void agregarAlStock(String depositoId, Integer cantidad){
+    public void agregarAlStock(String depositoId, String productoId, Integer cantidad){
 
         Deposito deposito = buscarDepositoID(depositoId);
 
@@ -274,19 +300,32 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             return;
         }
 
-        if(!deposito.estaLleno()){
-            int espacio = deposito.espacioDisponible();
+        int espacio = deposito.espacioDisponible();
+        int cantidadAGuardar = Math.min(cantidad, espacio);
 
-            if(cantidad <= espacio){
-                deposito.agregarAlStock(cantidad);
-                depositoRepository.save(deposito);
-                System.out.println("Producto guardado en deposito sin sobrante");
-            }
-            else{
-                deposito.agregarAlStock(espacio);
-                depositoRepository.save(deposito);
-                System.out.println("Producto guardado en deposito sobrante descartado");
-            }
+        // agrega el stock al deposito y lo guarda en el repositorio
+        deposito.agregarAlStock(cantidadAGuardar);
+        depositoRepository.save(deposito);
+
+        StockDeposito stock = stockDepositoRepository
+                .findByDepositoidAndProductoid(depositoId, productoId)
+                .orElse(null);
+
+        if (stock == null) {
+
+            stock = new StockDeposito(depositoId, productoId, cantidadAGuardar);//no hay stock del producto en ese deposito
+
+        } else {
+
+            stock.setCantidad(stock.getCantidad() + cantidadAGuardar);//si hay stock del producto en ese deposito
+
+        }
+        stockDepositoRepository.save(stock);
+
+        if (cantidadAGuardar < cantidad) {
+            System.out.println("Producto guardado en deposito, sobrante descartado");
+        } else {
+            System.out.println("Producto guardado en deposito sin sobrante");
         }
     }
 
@@ -513,7 +552,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
 
         // caso: sin necesidades → va al stock
         if (necesidadesDelProducto == null || necesidadesDelProducto.isEmpty()) {
-            agregarAlStock(depositoid, cantidad);
+            agregarAlStock(depositoid, productoid, cantidad);
             System.out.println("[WORKER] Sin necesidades, guardado en stock: " + depositoid);
             return;
         }
@@ -530,7 +569,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
 
         // caso: todas eran recurrentes insuficientes → va al stock
         if (listaFiltrada.isEmpty()) {
-            agregarAlStock(depositoid, cantidad);
+            agregarAlStock(depositoid, productoid, cantidad);
             System.out.println("[WORKER] Solo recurrentes insuficientes, guardado en stock");
             return;
         }
@@ -561,7 +600,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             if (cantidad >= cantidadNecesaria) {
                 int sobrante = cantidad - cantidadNecesaria;
                 if (sobrante > 0) {
-                    agregarAlStock(depositoid, sobrante);
+                    agregarAlStock(depositoid, productoid, sobrante);
                     System.out.println("[WORKER] Asignación creada. Sobrante de " + sobrante + " al stock");
                 } else {
                     System.out.println("[WORKER] Asignación creada sin sobrante");
@@ -611,13 +650,48 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         return asignacionDTO;
     }
 
+    public Integer stockDisponibleDeProducto(String productoId) {
+        List<StockDeposito> stocks = stockDepositoRepository.findByProductoid(productoId);
+        return stocks.stream()
+                .mapToInt(StockDeposito::getCantidad)
+                .sum();
+    }
+
+    // crea asignaciones de necesidad con lo que hay en stock
+    @Transactional
+    public LogisticaDTOs.AsignacionDTO asignarPorSolicitud(String necesidadID, String productoID, Integer cantidad) {
+
+        // verifica que haya stock suficiente del producto
+        Integer disponible = stockDisponibleDeProducto(productoID);
+        if (disponible < cantidad) {
+            throw new RuntimeException("Stock insuficiente. Disponible: " + disponible + ", solicitado: " + cantidad);
+        }
+
+        // descuenta del stock (de los depósitos que tengan ese producto)
+        descontarStock(productoID, cantidad);
+
+        // crea la asignación con origen SOLICITUD_DONADORES
+        LogisticaDTOs.AsignacionDTO asignacionDTO = new LogisticaDTOs.AsignacionDTO(
+                java.util.UUID.randomUUID().toString(),
+                "paq-solicitud-" + necesidadID,
+                necesidadID,
+                java.time.LocalDateTime.now(),
+                LogisticaDTOs.EstadoAsginacionEnum.ASIGNADA,
+                LogisticaDTOs.OrigenAsignacionEnum.SOLICITUD_DONADORES
+        );
+
+        Asignacion nuevaAsignacion = new Asignacion(asignacionDTO);
+        asignacionRepository.save(nuevaAsignacion);
+
+        return asignacionDTO;
+    }
+
     public void limpiarTodaLaBase() {
         asignacionRepository.deleteAll();
         necesidaddematerialRepository.deleteAll();
         depositoRepository.deleteAll();
         System.out.println("Base de datos de Logística reseteada por completo.");
     }
-
 
 }
 

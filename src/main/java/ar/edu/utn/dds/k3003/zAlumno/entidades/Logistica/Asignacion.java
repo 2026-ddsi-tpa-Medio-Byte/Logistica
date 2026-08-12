@@ -16,6 +16,7 @@ public class Asignacion {
     private LocalDateTime fecha;
     @Enumerated(EnumType.STRING)
     private EstadoAsginacionEnum estado;
+    private LogisticaDTOs.OrigenAsignacionEnum origen;
 
     public Asignacion() {
     }
@@ -26,6 +27,7 @@ public class Asignacion {
         this.necesidadid = dto.necesidadid();
         this.fecha = dto.fecha();
         this.estado = dto.estado();
+        this.origen = dto.origen();
     }
 
     public void setEstado(EstadoAsginacionEnum nuevoestado) { this.estado = nuevoestado; }
@@ -34,4 +36,5 @@ public class Asignacion {
     public String getNecesidadId() { return necesidadid; }
     public LocalDateTime getfecha() { return fecha; }
     public EstadoAsginacionEnum getEstado() { return estado; }
+    public LogisticaDTOs.OrigenAsignacionEnum getOrigen() { return origen; }
 }

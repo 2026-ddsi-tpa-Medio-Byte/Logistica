@@ -6,6 +6,7 @@ import ar.edu.utn.dds.k3003.catedra.dtos.logistica.TipoAlgoritmoEnum;
 import ar.edu.utn.dds.k3003.zAlumno.entidades.Logistica.LogisticaDTOs;
 import ar.edu.utn.dds.k3003.zAlumno.services.LogisticaService;
 import java.util.List;
+import java.util.Map;
 
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,6 +81,34 @@ public class IntegracionLogisticaController {
         asignacion.necesidadid(),
         asignacion.fecha(),
         ar.edu.utn.dds.k3003.catedra.dtos.logistica.EstadoAsginacionEnum.valueOf(asignacion.estado().name())));
+  }
+
+  @Operation(summary = "Consulta el stock disponible de un producto")
+  @GetMapping("/stock/{productoID}")
+  public ResponseEntity<Map<String, Integer>> stockDisponible(@PathVariable String productoID) {
+    Integer disponible = logisticaService.stockDisponibleDeProducto(productoID);
+    return ResponseEntity.ok(Map.of("disponible", disponible));
+  }
+
+  @Operation(summary = "Asigna stock directamente a una necesidad por solicitud de Donadores(sin donacion, con lo que hay en stock)")
+  @PostMapping("/asignaciones/solicitud")
+  public ResponseEntity<AsignacionDTO> asignarPorSolicitud(@RequestBody LogisticaDTOs.SolicitudAsignacionDTO solicitud) {
+    try {
+      LogisticaDTOs.AsignacionDTO asignacion = logisticaService.asignarPorSolicitud(
+              solicitud.necesidadID(),
+              solicitud.productoID(),
+              solicitud.cantidad()
+      );
+      return ResponseEntity.status(HttpStatus.CREATED).body(new AsignacionDTO(
+              asignacion.asignacionid(),
+              asignacion.paqueteid(),
+              asignacion.necesidadid(),
+              asignacion.fecha(),
+              ar.edu.utn.dds.k3003.catedra.dtos.logistica.EstadoAsginacionEnum.valueOf(asignacion.estado().name())
+      ));
+    } catch (RuntimeException e) {
+      return ResponseEntity.status(HttpStatus.CONFLICT).build();
+    }
   }
 
   private static DepositoDTO aDepositoDTOCatedra(LogisticaDTOs.DepositoDTO deposito) {

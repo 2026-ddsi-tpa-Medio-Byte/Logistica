@@ -15,6 +15,11 @@ public class LogisticaDTOs {
         PRIOSCORE
     }
 
+    public enum OrigenAsignacionEnum {
+        MATCHMAKING,
+        SOLICITUD_DONADORES
+    }
+
     public record DepositoDTO(
             String nombre,
             String depositoid,
@@ -36,7 +41,8 @@ public class LogisticaDTOs {
             String paqueteid,
             String necesidadid,
             LocalDateTime fecha,
-            EstadoAsginacionEnum estado
+            EstadoAsginacionEnum estado,
+            OrigenAsignacionEnum origen
     ){}
 
     public record GestionDonacionResponseDTO(
@@ -50,6 +56,13 @@ public class LogisticaDTOs {
             String donacionId,
             String mensajeAsignacion,
             String asignacionId
+    ) {}
+
+    public record SolicitudAsignacionDTO(
+            String necesidadID,
+            String productoID,
+            Integer cantidad,
+            String origen
     ) {}
 
     //SWAGGER

@@ -33,9 +33,10 @@ public class subAtendidos implements Algoritmos_Interface {
         return new LogisticaDTOs.AsignacionDTO(
                 java.util.UUID.randomUUID().toString(),
                 paquete.paqueteid(),
-                dtoElegido.necesidadid(),      // ← necesidadid() no id()
+                dtoElegido.necesidadid(),
                 LocalDateTime.now(),
-                LogisticaDTOs.EstadoAsginacionEnum.ASIGNADA
+                LogisticaDTOs.EstadoAsginacionEnum.ASIGNADA,
+                LogisticaDTOs.OrigenAsignacionEnum.MATCHMAKING
         );
     }
 }
