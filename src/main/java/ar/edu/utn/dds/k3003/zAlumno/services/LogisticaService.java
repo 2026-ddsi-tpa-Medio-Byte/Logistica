@@ -335,153 +335,6 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         depositoRepository.save(deposito);
     }
 
-    /*@Transactional
-    @Override
-    public LogisticaDTOs.GestionDonacionResponseDTO gestionarDonacion(String depositoid, String donacionid, String productoid, Integer cantidad) {
-
-
-        //crea paquete
-        LogisticaDTOs.PaqueteDTO paqueteMatch = new LogisticaDTOs.PaqueteDTO(
-                "paq-" + donacionid,
-                donacionid,
-                productoid,
-                cantidad
-        );
-
-        //verifica que la cantidad de la donacion NO sea 0
-        if (cantidad <= 0) {
-            System.out.println("Cantidad insuficiente");
-            return new LogisticaDTOs.GestionDonacionResponseDTO(
-                    "Cantidad insuficiente, no se creó asignación",
-                    buscarDepositoIDDTO(depositoid),
-                    null
-            );
-        }
-
-        //verifica que el deposito exista
-        Deposito deposito = buscarDepositoID(depositoid);
-        if(deposito == null){
-            System.out.println("Deposito id: " + depositoid + " no encontrado");
-            return new LogisticaDTOs.GestionDonacionResponseDTO(
-                    "Deposito id: " + depositoid + " no encontrado",
-                    null,
-                    null);
-        }
-
-        List<DonacionYEntiDTOs.NecesidadMaterialDTO> necesidadesDelProducto =
-                donadoresYEntidadesClient.obtenerNecesidadesConCantidad(productoid);
-
-        //verifica existencia de necesidades para producto especifico
-        if (necesidadesDelProducto == null || necesidadesDelProducto.isEmpty()) {
-
-            //NO NECESIDADES Y DEPOSITO LLENO
-            if(deposito.getStockActual() >= deposito.getCapacidadMaxima()){
-                System.out.println("No existe necesidad para el producto: " + productoid + "y el deposito " +  depositoid + "esta lleno");
-                return new LogisticaDTOs.GestionDonacionResponseDTO(
-                        "No existe necesidad para el producto: " + productoid + "y el deposito " +  depositoid + "esta lleno",
-                        buscarDepositoIDDTO(depositoid),
-                        null);
-            }
-            //NO NECESIDADES Y DEPOSITO DISPONIBLE, SE GUARDA EN DEPOSITO
-            agregarAlStock(depositoid, cantidad);
-            System.out.println("No existe necesidad para el producto: " + productoid + ", se guarda en deposito: " + depositoid);
-            return new LogisticaDTOs.GestionDonacionResponseDTO(
-                    "No existe necesidad para el producto: " + productoid + ", se guarda en deposito: " + depositoid,
-                    buscarDepositoIDDTO(depositoid),
-                    null
-            );
-        }
-
-        //verifica existencia de necesidades, filtra las insatisfechas y filtra las recurrentes insuficientes
-        List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadesFiltradaDTO =
-                necesidadesDelProducto.stream()
-                        .filter(n -> {
-                            boolean noAlcanza = cantidad < (n.cantidadObjetivo() - n.cantidadActual());
-                            boolean esRecurrente = n.tipo() == DonacionYEntiDTOs.TipoNecesidadMaterialEnum.RECURRENTE;
-                            return !(noAlcanza && esRecurrente);
-                        })
-                        .collect(Collectors.toList());
-
-        LogisticaDTOs.AsignacionDTO asignacion = null;
-
-        if (!listaNecesidadesFiltradaDTO.isEmpty()) {
-            asignacion = ejecutarMatchmaking(depositoid, paqueteMatch, listaNecesidadesFiltradaDTO);
-            if (asignacion != null) {
-                Asignacion nuevaAsignacion = new Asignacion(asignacion);
-                asignacionRepository.save(nuevaAsignacion);
-
-                final String necesidadIdBuscada = asignacion.necesidadid();
-
-                DonacionYEntiDTOs.NecesidadMaterialDTO necesidadElegida =
-                        necesidadesDelProducto.stream()
-                                .filter(n -> n.necesidadid().equals(necesidadIdBuscada))
-                                .findFirst()
-                                .orElse(null);
-
-                if (necesidadElegida != null) {
-
-                    int cantidadNecesaria = necesidadElegida.cantidadObjetivo() - necesidadElegida.cantidadActual();
-
-                    // caso: donación exacta o suficiente
-                    if (cantidad >= cantidadNecesaria) {
-                        int sobrante = cantidad - cantidadNecesaria;
-
-                        if (sobrante > 0) {
-                            if (!deposito.estaLleno()) {
-                                agregarAlStock(depositoid, sobrante);
-                                System.out.println("Asignación creada con éxito. Sobrante de " + sobrante + " guardado en stock");
-                                return new LogisticaDTOs.GestionDonacionResponseDTO(
-                                        "Asignación creada con éxito. Sobrante de " + sobrante + " unidades guardado en stock",
-                                        buscarDepositoIDDTO(depositoid),
-                                        asignacion
-                                );
-                            } else {
-                                System.out.println("Asignación creada con éxito. Sobrante descartado: depósito lleno");
-                                return new LogisticaDTOs.GestionDonacionResponseDTO(
-                                        "Asignación creada con éxito. Sobrante de " + sobrante + " unidades descartado: depósito lleno",
-                                        buscarDepositoIDDTO(depositoid),
-                                        asignacion
-                                );
-                            }
-                        }
-
-                        System.out.println("Asignación creada con éxito. Sin sobrante");
-                        return new LogisticaDTOs.GestionDonacionResponseDTO(
-                                "Asignación creada con éxito. Sin sobrante",
-                                buscarDepositoIDDTO(depositoid),
-                                asignacion
-                        );
-                    }
-
-                    // caso: donación insuficiente
-                    if (cantidad < cantidadNecesaria) {
-                        if (necesidadElegida.tipo() == DonacionYEntiDTOs.TipoNecesidadMaterialEnum.EXTRAORDINARIA) {
-                            System.out.println("Asignación creada con éxito. Necesidad EXTRAORDINARIA, cantidad insuficiente pero se asigna igual");
-                            return new LogisticaDTOs.GestionDonacionResponseDTO(
-                                    "Asignación creada con éxito. Necesidad extraordinaria cubierta parcialmente",
-                                    buscarDepositoIDDTO(depositoid),
-                                    asignacion
-                            );
-                        }
-                    }
-                }
-            }
-        } else {
-            System.out.println("Existen necesidades para el producto, pero todas están cubiertas (cantidad actual >= objetivo)");
-            return new LogisticaDTOs.GestionDonacionResponseDTO(
-                    "No existen necesidades insatisfechas para el producto: " + productoid,
-                    buscarDepositoIDDTO(depositoid),
-                    null
-            );
-        }
-
-        return new LogisticaDTOs.GestionDonacionResponseDTO(
-                asignacion != null ? "Asignación creada con éxito" : "Todas las necesidades del producto ya están cubiertas",
-                buscarDepositoIDDTO(depositoid),
-                asignacion
-        );
-    }*/
-
     @Override
     public LogisticaDTOs.GestionDonacionResponseDTO gestionarDonacion(String depositoid, String donacionid, String productoid, Integer cantidad) {
 
@@ -546,11 +399,17 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             return;
         }
 
+        //para que no sea cree mas de una asignacion con el mismo paquete y misma necesidad
+        if (asignacionRepository.existsByPaqueteid(paqueteMatch.paqueteid())) {
+            System.out.println("[WORKER] La donacion " + donacionid + " ya fue procesada, se ignora");
+            return;
+        }
+
         // consulta necesidades a DonadoresYEntidades
         List<DonacionYEntiDTOs.NecesidadMaterialDTO> necesidadesDelProducto =
                 donadoresYEntidadesClient.obtenerNecesidadesConCantidad(productoid);
 
-        // caso: sin necesidades → va al stock
+        // caso: sin necesidades guarda en stock
         if (necesidadesDelProducto == null || necesidadesDelProducto.isEmpty()) {
             agregarAlStock(depositoid, productoid, cantidad);
             System.out.println("[WORKER] Sin necesidades, guardado en stock: " + depositoid);

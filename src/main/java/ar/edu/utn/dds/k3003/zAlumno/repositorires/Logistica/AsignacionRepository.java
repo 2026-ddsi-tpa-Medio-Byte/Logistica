@@ -8,5 +8,9 @@ import java.util.Optional;
 
 @Repository
 public interface AsignacionRepository extends JpaRepository<Asignacion, String> {
+
     Optional<Asignacion> findByPaqueteid(String paqueteid);
+
+    boolean existsByPaqueteid(String paqueteid);
+
 }
