@@ -546,6 +546,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
     }
 
     public void limpiarTodaLaBase() {
+        stockDepositoRepository.deleteAll();
         asignacionRepository.deleteAll();
         necesidaddematerialRepository.deleteAll();
         depositoRepository.deleteAll();
