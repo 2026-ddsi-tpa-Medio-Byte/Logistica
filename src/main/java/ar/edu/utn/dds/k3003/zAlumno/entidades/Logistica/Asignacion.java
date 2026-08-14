@@ -17,6 +17,9 @@ public class Asignacion {
     @Enumerated(EnumType.STRING)
     private EstadoAsginacionEnum estado;
     private LogisticaDTOs.OrigenAsignacionEnum origen;
+    private String donacionid;
+    private String productoid;
+    private Integer cantidad;
 
     public Asignacion() {
     }
@@ -28,6 +31,9 @@ public class Asignacion {
         this.fecha = dto.fecha();
         this.estado = dto.estado();
         this.origen = dto.origen();
+        this.donacionid = dto.donacionid();
+        this.productoid = dto.productoid();
+        this.cantidad = dto.cantidad();
     }
 
     public void setEstado(EstadoAsginacionEnum nuevoestado) { this.estado = nuevoestado; }
@@ -37,4 +43,7 @@ public class Asignacion {
     public LocalDateTime getfecha() { return fecha; }
     public EstadoAsginacionEnum getEstado() { return estado; }
     public LogisticaDTOs.OrigenAsignacionEnum getOrigen() { return origen; }
+    public String getDonacionid() { return donacionid; }
+    public String getProductoid() { return productoid; }
+    public Integer getCantidad() { return cantidad; }
 }

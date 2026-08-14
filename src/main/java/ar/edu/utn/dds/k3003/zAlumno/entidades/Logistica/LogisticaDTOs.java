@@ -42,13 +42,20 @@ public class LogisticaDTOs {
             String necesidadid,
             LocalDateTime fecha,
             EstadoAsginacionEnum estado,
-            OrigenAsignacionEnum origen
+            OrigenAsignacionEnum origen,
+            String donacionid,
+            String productoid,
+            Integer cantidad
     ){}
 
     public record GestionDonacionResponseDTO(
             String mensaje,
             DepositoDTO deposito,
             AsignacionDTO asignacion
+    ) {}
+
+    public record ReportarEntregaRequestDTO(
+            String paqueteid
     ) {}
 
     public record ReporteEntregaResponseDTO(
@@ -64,28 +71,6 @@ public class LogisticaDTOs {
             Integer cantidad,
             String origen
     ) {}
-
-    //SWAGGER
-
-    public record DepositoBase(
-            String nombre,
-            String direccion,
-            Integer capacidadMaxima
-    ){}
-
-    public record DepositoRequest(
-            String nombre,
-            String direccion,
-            Integer capacidadMaxima
-    ){}
-
-    public record DepositoResponse(
-            String nombre,
-            String direccion,
-            Integer capacidadMaxima,
-            String id,
-            PaqueteDTO stockActual
-    ){}
 
     public record GestionDonacionDTO(
          String depositoID,

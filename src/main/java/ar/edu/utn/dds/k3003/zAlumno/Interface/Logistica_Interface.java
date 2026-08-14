@@ -27,7 +27,7 @@ public interface Logistica_Interface {
      void setAlgoritmoMM(String depositoid, LogisticaDTOs.TipoAlgoritmoEnum algoritmo);
      LogisticaDTOs.AsignacionDTO ejecutarMatchmaking(String depositoid, LogisticaDTOs.PaqueteDTO paquete, List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadMaterialDTO);
      //LogisticaDTOs.AsignacionDTO ejecutarMatchmaking(String depositoid, LogisticaDTOs.PaqueteDTO paquete, List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadMaterialDTO);
-     LogisticaDTOs.ReporteEntregaResponseDTO reportarEntrega(LogisticaDTOs.PaqueteDTO paquete);
+     LogisticaDTOs.ReporteEntregaResponseDTO reportarEntrega(String paqueteid);
      List<LogisticaDTOs.DepositoDTO> obtenerTodosDepositosDTO();
 
      //LogisticaDTOs.AsignacionDTO buscarAsignacionPorPaqueteID(String paqueteid);

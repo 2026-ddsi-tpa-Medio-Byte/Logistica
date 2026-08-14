@@ -37,7 +37,10 @@ public class prioScore implements Algoritmos_Interface {
                 dtoElegido.necesidadid(),
                 LocalDateTime.now(),
                 LogisticaDTOs.EstadoAsginacionEnum.ASIGNADA,
-                LogisticaDTOs.OrigenAsignacionEnum.MATCHMAKING
+                LogisticaDTOs.OrigenAsignacionEnum.MATCHMAKING,
+                paquete.donacionID(),
+                paquete.productoid(),
+                paquete.cantidad()
         );
     }
 }

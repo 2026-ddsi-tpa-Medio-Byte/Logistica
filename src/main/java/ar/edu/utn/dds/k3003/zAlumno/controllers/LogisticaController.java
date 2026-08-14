@@ -63,7 +63,7 @@ public class LogisticaController {
             @RequestParam Integer cantidad) {
 
         try {
-            LogisticaDTOs.GestionDonacionResponseDTO  resultado = logisticaService.gestionarDonacion(depositoid, donacionid, productoid, cantidad);
+            LogisticaDTOs.GestionDonacionResponseDTO resultado = logisticaService.gestionarDonacion(depositoid, donacionid, productoid, cantidad);
             metricasService.incrementarAsignacionesCreadas();
             return ResponseEntity.ok(resultado);
         } catch (Exception e) {
@@ -115,11 +115,36 @@ public class LogisticaController {
         return ResponseEntity.status(HttpStatus.CREATED).body(guardada);
     }
 
-    @Operation(summary = "Reporta la entrega efectiva de un paquete")
+    @Operation(summary = "Reporta la entrega efectiva de un paquete. Solo requiere el paqueteid; " +
+            "la cantidad, el producto y la donación se toman de la asignación guardada.")
     @PostMapping("/asignaciones/reportar-entrega")
-    public ResponseEntity<LogisticaDTOs.ReporteEntregaResponseDTO> reportarEntregaEfectiva(@RequestBody LogisticaDTOs.PaqueteDTO paquete) {
+    public ResponseEntity<LogisticaDTOs.ReporteEntregaResponseDTO> reportarEntregaEfectiva(
+            @RequestBody LogisticaDTOs.ReportarEntregaRequestDTO request) {
+
+        // 1) validación de entrada: el paqueteid es obligatorio
+        if (request == null || request.paqueteid() == null || request.paqueteid().isBlank()) {
+            return ResponseEntity.badRequest().body(new LogisticaDTOs.ReporteEntregaResponseDTO(
+                    "Debe indicar el paqueteid", null, null, null));
+        }
+
+        // 2) la asignación tiene que existir
+        LogisticaDTOs.AsignacionDTO asignacion =
+                logisticaService.buscarAsignacionPorPaqueteIDDTO(request.paqueteid());
+        if (asignacion == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new LogisticaDTOs.ReporteEntregaResponseDTO(
+                    "No existe asignación para el paquete: " + request.paqueteid(), null, null, null));
+        }
+
+        // 3) no se puede volver a entregar algo ya entregado (idempotencia)
+        if (asignacion.estado() == LogisticaDTOs.EstadoAsginacionEnum.COMPLETADA) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(new LogisticaDTOs.ReporteEntregaResponseDTO(
+                    "La asignación ya fue entregada", asignacion.donacionid(),
+                    "Asignación ya completada", asignacion.asignacionid()));
+        }
+
         try {
-            LogisticaDTOs.ReporteEntregaResponseDTO resultado = logisticaService.reportarEntrega(paquete);
+            LogisticaDTOs.ReporteEntregaResponseDTO resultado =
+                    logisticaService.reportarEntrega(request.paqueteid());
             metricasService.incrementarEntregasReportadas();
             return ResponseEntity.ok(resultado);
         } catch (Exception e) {
@@ -132,5 +157,4 @@ public class LogisticaController {
                             null));
         }
     }
-
 }

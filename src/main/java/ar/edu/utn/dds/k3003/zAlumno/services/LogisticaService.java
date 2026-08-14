@@ -26,6 +26,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.NoSuchElementException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -221,7 +222,10 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 asig.getNecesidadId(),
                 asig.getfecha(),
                 asig.getEstado(),
-                asig.getOrigen()
+                asig.getOrigen(),
+                asig.getDonacionid(),
+                asig.getProductoid(),
+                asig.getCantidad()
         );
     }
 
@@ -426,7 +430,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                         })
                         .collect(Collectors.toList());
 
-        // caso: todas eran recurrentes insuficientes → va al stock
+        // caso: todas eran recurrentes insuficientes van al stock
         if (listaFiltrada.isEmpty()) {
             agregarAlStock(depositoid, productoid, cantidad);
             System.out.println("[WORKER] Solo recurrentes insuficientes, guardado en stock");
@@ -440,11 +444,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             return;
         }
 
-        // guarda la asignación
-        Asignacion nuevaAsignacion = new Asignacion(asignacion);
-        asignacionRepository.save(nuevaAsignacion);
-
-        // busca la necesidad elegida para calcular el sobrante
+        // busca la necesidad elegida para calcular cuánto se asigna y cuánto sobra
         final String necesidadIdBuscada = asignacion.necesidadid();
         DonacionYEntiDTOs.NecesidadMaterialDTO necesidadElegida =
                 necesidadesDelProducto.stream()
@@ -452,56 +452,86 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                         .findFirst()
                         .orElse(null);
 
+        // cantidad que realmente se asigna a la necesidad y sobrante que va al stock
+        int cantidadAsignada = cantidad;
+        int sobrante = 0;
         if (necesidadElegida != null) {
-            int cantidadNecesaria = necesidadElegida.cantidadObjetivo() - necesidadElegida.cantidadActual();
-
-            // si la donación alcanza y sobra, el sobrante va al stock
+            int cantidadNecesaria = Math.max(0, necesidadElegida.cantidadObjetivo() - necesidadElegida.cantidadActual());
             if (cantidad >= cantidadNecesaria) {
-                int sobrante = cantidad - cantidadNecesaria;
-                if (sobrante > 0) {
-                    agregarAlStock(depositoid, productoid, sobrante);
-                    System.out.println("[WORKER] Asignación creada. Sobrante de " + sobrante + " al stock");
-                } else {
-                    System.out.println("[WORKER] Asignación creada sin sobrante");
-                }
+                // alcanza (o sobra): se asigna lo necesario y el resto va al stock
+                cantidadAsignada = cantidadNecesaria;
+                sobrante = cantidad - cantidadNecesaria;
             } else {
-                // donación insuficiente pero EXTRAORDINARIA → se asignó igual
-                System.out.println("[WORKER] Asignación creada. Necesidad extraordinaria cubierta parcialmente");
+                // donación insuficiente pero EXTRAORDINARIA → se asigna lo donado
+                cantidadAsignada = cantidad;
             }
+        }
+
+        // guarda la asignación con la cantidad efectivamente asignada (no la del paquete)
+        LogisticaDTOs.AsignacionDTO asignacionFinal = new LogisticaDTOs.AsignacionDTO(
+                asignacion.asignacionid(),
+                asignacion.paqueteid(),
+                asignacion.necesidadid(),
+                asignacion.fecha(),
+                asignacion.estado(),
+                asignacion.origen(),
+                donacionid,
+                productoid,
+                cantidadAsignada
+        );
+        Asignacion nuevaAsignacion = new Asignacion(asignacionFinal);
+        asignacionRepository.save(nuevaAsignacion);
+
+        if (sobrante > 0) {
+            agregarAlStock(depositoid, productoid, sobrante);
+            System.out.println("[WORKER] Asignación creada. Sobrante de " + sobrante + " al stock");
+        } else {
+            System.out.println("[WORKER] Asignación creada. Cantidad asignada: " + cantidadAsignada);
         }
     }
 
-    public LogisticaDTOs.ReporteEntregaResponseDTO reportarEntrega(LogisticaDTOs.PaqueteDTO paquete) {
+    public LogisticaDTOs.ReporteEntregaResponseDTO reportarEntrega(String paqueteid) {
 
-        Asignacion asignacion = buscarAsignacionPorPaqueteID(paquete.paqueteid());
+        Asignacion asignacion = buscarAsignacionPorPaqueteID(paqueteid);
         if (asignacion == null) {
-            throw new RuntimeException("No existe asignación para el paquete: " + paquete.paqueteid());
+            throw new NoSuchElementException("No existe asignación para el paquete: " + paqueteid);
         }
+
+        // lo que se entrega es de la asignación guardada, no del body.
+        String donacionId = asignacion.getDonacionid();
+        Integer cantidadAEntregar = asignacion.getCantidad();
 
         asignacion.setEstado(LogisticaDTOs.EstadoAsginacionEnum.COMPLETADA);
         asignacionRepository.save(asignacion);
 
-        try {
-            donadoresYEntidadesClient.satisfacerNecesidad(asignacion.getNecesidadId(), paquete.cantidad());
-        } catch (Exception e) {
-            System.out.println("No se pudo satisfacer la necesidad " + asignacion.getNecesidadId() + ": " + e.getMessage());
+        // satisface la necesidad con la cantidad que realmente se le asignó
+        if (cantidadAEntregar != null && cantidadAEntregar > 0) {
+            try {
+                donadoresYEntidadesClient.satisfacerNecesidad(asignacion.getNecesidadId(), cantidadAEntregar);
+            } catch (Exception e) {
+                System.out.println("No se pudo satisfacer la necesidad " + asignacion.getNecesidadId() + ": " + e.getMessage());
+            }
         }
 
-        try {
-            donacionesClient.cambiarEstadoDeDonacion(
-                    paquete.donacionID(),
-                    ar.edu.utn.dds.k3003.catedra.dtos.donaciones.EstadoDonacionEnum.ACEPTADA);
-        } catch (Exception e) {
-            System.out.println("No se pudo cambiar el estado de la donación " + paquete.donacionID() + ": " + e.getMessage());
+        // cambia el estado de la donación (solo si la asignación vino de una donación real)
+        if (donacionId != null && !donacionId.isBlank()) {
+            try {
+                donacionesClient.cambiarEstadoDeDonacion(
+                        donacionId,
+                        ar.edu.utn.dds.k3003.catedra.dtos.donaciones.EstadoDonacionEnum.ACEPTADA);
+            } catch (Exception e) {
+                System.out.println("No se pudo cambiar el estado de la donación " + donacionId + ": " + e.getMessage());
+            }
         }
 
         return new LogisticaDTOs.ReporteEntregaResponseDTO(
-                "Donación aceptada",
-                paquete.donacionID(),
+                donacionId != null ? "Donación aceptada" : "Asignación entregada (sin donación asociada)",
+                donacionId,
                 "Asignación completada",
                 asignacion.getId()
         );
     }
+
 
     public LogisticaDTOs.AsignacionDTO altaAsignacion(LogisticaDTOs.AsignacionDTO asignacionDTO) {
         Asignacion nuevaAsignacion = new Asignacion(asignacionDTO);
@@ -529,14 +559,17 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         // descuenta del stock (de los depósitos que tengan ese producto)
         descontarStock(productoID, cantidad);
 
-        // crea la asignación con origen SOLICITUD_DONADORES
+        // crea la asignación con origen solicitud donadores
         LogisticaDTOs.AsignacionDTO asignacionDTO = new LogisticaDTOs.AsignacionDTO(
                 java.util.UUID.randomUUID().toString(),
                 "paq-solicitud-" + necesidadID,
                 necesidadID,
                 java.time.LocalDateTime.now(),
                 LogisticaDTOs.EstadoAsginacionEnum.ASIGNADA,
-                LogisticaDTOs.OrigenAsignacionEnum.SOLICITUD_DONADORES
+                LogisticaDTOs.OrigenAsignacionEnum.SOLICITUD_DONADORES,
+                null,
+                productoID,
+                cantidad
         );
 
         Asignacion nuevaAsignacion = new Asignacion(asignacionDTO);
