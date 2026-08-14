@@ -139,15 +139,15 @@ public class LogisticaController {
             "la cantidad, el producto y la donación se toman de la asignación guardada.")
     @PostMapping("/asignaciones/reportar-entrega")
     public ResponseEntity<LogisticaDTOs.ReporteEntregaResponseDTO> reportarEntregaEfectiva(
-            @RequestBody LogisticaDTOs.ReportarEntregaRequestDTO request) {
+            @org.springframework.web.bind.annotation.RequestBody LogisticaDTOs.ReportarEntregaRequestDTO request) {
 
-        // 1) validación de entrada: el paqueteid es obligatorio
+        // validación de entrada: el paqueteid es obligatorio
         if (request == null || request.paqueteid() == null || request.paqueteid().isBlank()) {
             return ResponseEntity.badRequest().body(new LogisticaDTOs.ReporteEntregaResponseDTO(
                     "Debe indicar el paqueteid", null, null, null));
         }
 
-        // 2) la asignación tiene que existir
+        // la asignación tiene que existir
         LogisticaDTOs.AsignacionDTO asignacion =
                 logisticaService.buscarAsignacionPorPaqueteIDDTO(request.paqueteid());
         if (asignacion == null) {
@@ -155,7 +155,7 @@ public class LogisticaController {
                     "No existe asignación para el paquete: " + request.paqueteid(), null, null, null));
         }
 
-        // 3) no se puede volver a entregar algo ya entregado (idempotencia)
+        // no se puede volver a entregar algo ya entregado (idempotencia)
         if (asignacion.estado() == LogisticaDTOs.EstadoAsginacionEnum.COMPLETADA) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(new LogisticaDTOs.ReporteEntregaResponseDTO(
                     "La asignación ya fue entregada", asignacion.donacionid(),
