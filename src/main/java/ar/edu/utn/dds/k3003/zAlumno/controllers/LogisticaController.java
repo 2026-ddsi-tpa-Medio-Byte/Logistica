@@ -5,6 +5,9 @@ import ar.edu.utn.dds.k3003.zAlumno.entidades.Logistica.LogisticaDTOs;
 import ar.edu.utn.dds.k3003.zAlumno.services.LogisticaService;
 import ar.edu.utn.dds.k3003.zAlumno.services.MetricasService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,8 +51,25 @@ public class LogisticaController {
     }
 
     @Operation(summary = "Crea un nuevo depósito")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(examples = @ExampleObject(
+                    name = "Depósito nuevo",
+                    description = "El depositoid se autogenera, no hace falta enviarlo.",
+                    value = """
+                            {
+                              "nombre": "stirng",
+                              "depositoid": null,
+                              "direccion": "string",
+                              "capacidadMaxima": 1200,
+                              "stockActual": 0,
+                              "algoritmo": "SUBATENDIDOS"
+                            }
+                            """
+            ))
+    )
     @PostMapping("/depositos")
-    public ResponseEntity<LogisticaDTOs.DepositoDTO> crearDeposito(@RequestBody LogisticaDTOs.DepositoDTO nuevo) {
+    public ResponseEntity<LogisticaDTOs.DepositoDTO> crearDeposito(
+            @org.springframework.web.bind.annotation.RequestBody LogisticaDTOs.DepositoDTO nuevo) {
         LogisticaDTOs.DepositoDTO guardado = logisticaService.agregarDeposito(nuevo);
         return ResponseEntity.status(HttpStatus.CREATED).body(guardado);
     }
