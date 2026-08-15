@@ -7,7 +7,6 @@ import ar.edu.utn.dds.k3003.zAlumno.services.MetricasService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -143,6 +142,7 @@ public class LogisticaController {
 
         // validación de entrada: el paqueteid es obligatorio
         if (request == null || request.paqueteid() == null || request.paqueteid().isBlank()) {
+            metricasService.incrementarEntregaRechazada("sin_paqueteid");
             return ResponseEntity.badRequest().body(new LogisticaDTOs.ReporteEntregaResponseDTO(
                     "Debe indicar el paqueteid", null, null, null));
         }
@@ -151,12 +151,14 @@ public class LogisticaController {
         LogisticaDTOs.AsignacionDTO asignacion =
                 logisticaService.buscarAsignacionPorPaqueteIDDTO(request.paqueteid());
         if (asignacion == null) {
+            metricasService.incrementarEntregaRechazada("no_existe");
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new LogisticaDTOs.ReporteEntregaResponseDTO(
                     "No existe asignación para el paquete: " + request.paqueteid(), null, null, null));
         }
 
         // no se puede volver a entregar algo ya entregado (idempotencia)
         if (asignacion.estado() == LogisticaDTOs.EstadoAsginacionEnum.COMPLETADA) {
+            metricasService.incrementarEntregaRechazada("ya_entregada");
             return ResponseEntity.status(HttpStatus.CONFLICT).body(new LogisticaDTOs.ReporteEntregaResponseDTO(
                     "La asignación ya fue entregada", asignacion.donacionid(),
                     "Asignación ya completada", asignacion.asignacionid()));

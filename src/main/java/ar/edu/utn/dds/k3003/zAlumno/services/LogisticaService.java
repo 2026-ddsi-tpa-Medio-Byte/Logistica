@@ -65,6 +65,9 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
     @Autowired
     private RabbitTemplate rabbitTemplate;
 
+    @Autowired
+    private MetricasService metricasService;
+
     public LogisticaService(){
 
         LogisticaDTOs.DepositoDTO deposito1 = new LogisticaDTOs.DepositoDTO(
@@ -289,6 +292,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             Deposito deposito = buscarDepositoID(stock.getDepositoid());
             deposito.setStockActual(deposito.getStockActual() - aDescontar);
             depositoRepository.save(deposito);
+            metricasService.incrementarStockMovimiento("baja");
 
             restante -= aDescontar;
         }
@@ -325,6 +329,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
 
         }
         stockDepositoRepository.save(stock);
+        metricasService.incrementarStockMovimiento("alta");
 
         if (cantidadAGuardar < cantidad) {
             System.out.println("Producto guardado en deposito, sobrante descartado");
@@ -364,6 +369,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         // manda al worker
         DonacionMensaje mensaje = new DonacionMensaje(depositoid, donacionid, productoid, cantidad);
         rabbitTemplate.convertAndSend(RabbitMQConfig.COLA_DONACIONES, mensaje);
+        metricasService.incrementarDonacionesEncoladas();
 
         // respuesta
         return new LogisticaDTOs.GestionDonacionResponseDTO(
@@ -406,6 +412,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         //para que no sea cree mas de una asignacion con el mismo paquete y misma necesidad
         if (asignacionRepository.existsByPaqueteid(paqueteMatch.paqueteid())) {
             System.out.println("[WORKER] La donacion " + donacionid + " ya fue procesada, se ignora");
+            metricasService.incrementarAsignacionesDuplicadas();
             return;
         }
 
@@ -481,6 +488,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         );
         Asignacion nuevaAsignacion = new Asignacion(asignacionFinal);
         asignacionRepository.save(nuevaAsignacion);
+        metricasService.incrementarAsignacionesCreadas();
 
         if (sobrante > 0) {
             agregarAlStock(depositoid, productoid, sobrante);
@@ -508,6 +516,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         if (cantidadAEntregar != null && cantidadAEntregar > 0) {
             try {
                 donadoresYEntidadesClient.satisfacerNecesidad(asignacion.getNecesidadId(), cantidadAEntregar);
+                metricasService.incrementarNecesidadesSatisfechas();
             } catch (Exception e) {
                 System.out.println("No se pudo satisfacer la necesidad " + asignacion.getNecesidadId() + ": " + e.getMessage());
             }
