@@ -587,6 +587,21 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         return asignacionDTO;
     }
 
+    public LogisticaDTOs.StockDetalladoDTO stockDetalladoDeProducto(String productoID) {
+        List<StockDeposito> stocks = stockDepositoRepository.findByProductoid(productoID);
+
+        List<LogisticaDTOs.StockPorDepositoDTO> porDeposito = stocks.stream()
+                .filter(s -> s.getCantidad() != null && s.getCantidad() > 0)
+                .map(s -> new LogisticaDTOs.StockPorDepositoDTO(s.getDepositoid(), s.getCantidad()))
+                .collect(Collectors.toList());
+
+        int total = porDeposito.stream()
+                .mapToInt(LogisticaDTOs.StockPorDepositoDTO::disponible)
+                .sum();
+
+        return new LogisticaDTOs.StockDetalladoDTO(productoID, porDeposito, total);
+    }
+
     public void limpiarTodaLaBase() {
         stockDepositoRepository.deleteAll();
         asignacionRepository.deleteAll();

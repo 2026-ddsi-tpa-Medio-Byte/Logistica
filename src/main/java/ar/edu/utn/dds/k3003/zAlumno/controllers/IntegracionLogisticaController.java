@@ -90,6 +90,12 @@ public class IntegracionLogisticaController {
     return ResponseEntity.ok(Map.of("disponible", disponible));
   }
 
+  @Operation(summary = "Stock de un producto desglosado por deposito, con el total (vista detallada)")
+  @GetMapping("/stock/{productoID}/detalle")
+  public ResponseEntity<LogisticaDTOs.StockDetalladoDTO> stockDetallado(@PathVariable String productoID) {
+    return ResponseEntity.ok(logisticaService.stockDetalladoDeProducto(productoID));
+  }
+
   @Operation(summary = "Asigna stock directamente a una necesidad por solicitud de Donadores(sin donacion, con lo que hay en stock)")
   @PostMapping("/asignaciones/solicitud")
   public ResponseEntity<AsignacionDTO> asignarPorSolicitud(@RequestBody LogisticaDTOs.SolicitudAsignacionDTO solicitud) {

@@ -78,4 +78,15 @@ public class LogisticaDTOs {
          String productoID,
          Integer cantidad
     ){}
+
+    public record StockPorDepositoDTO(
+            String depositoid,
+            Integer disponible
+    ) {}
+
+    public record StockDetalladoDTO(
+            String productoid,
+            java.util.List<StockPorDepositoDTO> depositos,
+            Integer disponible
+    ) {}
 }
