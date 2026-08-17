@@ -81,12 +81,12 @@ public class LogisticaDTOs {
 
     public record StockPorDepositoDTO(
             String depositoid,
-            Integer disponible
+            Integer disponibleEnDeposito
     ) {}
 
     public record StockDetalladoDTO(
             String productoid,
             java.util.List<StockPorDepositoDTO> depositos,
-            Integer disponible
+            Integer totalDisponible
     ) {}
 }

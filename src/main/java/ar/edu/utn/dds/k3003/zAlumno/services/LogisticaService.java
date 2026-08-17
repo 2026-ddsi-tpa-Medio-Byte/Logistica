@@ -596,7 +596,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 .collect(Collectors.toList());
 
         int total = porDeposito.stream()
-                .mapToInt(LogisticaDTOs.StockPorDepositoDTO::disponible)
+                .mapToInt(LogisticaDTOs.StockPorDepositoDTO::disponibleEnDeposito)
                 .sum();
 
         return new LogisticaDTOs.StockDetalladoDTO(productoID, porDeposito, total);
@@ -611,7 +611,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                     List<LogisticaDTOs.StockPorDepositoDTO> porDep = e.getValue().stream()
                             .map(s -> new LogisticaDTOs.StockPorDepositoDTO(s.getDepositoid(), s.getCantidad()))
                             .collect(Collectors.toList());
-                    int total = porDep.stream().mapToInt(LogisticaDTOs.StockPorDepositoDTO::disponible).sum();
+                    int total = porDep.stream().mapToInt(LogisticaDTOs.StockPorDepositoDTO::disponibleEnDeposito).sum();
                     return new LogisticaDTOs.StockDetalladoDTO(e.getKey(), porDep, total);
                 })
                 .collect(Collectors.toList());
