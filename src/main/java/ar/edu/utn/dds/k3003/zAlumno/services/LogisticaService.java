@@ -284,14 +284,18 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         for (StockDeposito stock : stocks) {
             if (restante <= 0) break;
 
-            int aDescontar = Math.min(stock.getCantidad(), restante);
-            stock.setCantidad(stock.getCantidad() - aDescontar);
+            int cantidadStock = stock.getCantidad() != null ? stock.getCantidad() : 0;
+            int aDescontar = Math.min(cantidadStock, restante);
+            stock.setCantidad(cantidadStock - aDescontar);
             stockDepositoRepository.save(stock);
 
             // actualiza el depósito
             Deposito deposito = buscarDepositoID(stock.getDepositoid());
-            deposito.setStockActual(deposito.getStockActual() - aDescontar);
-            depositoRepository.save(deposito);
+            if (deposito != null) {
+                int stockActual = deposito.getStockActual() != null ? deposito.getStockActual() : 0;
+                deposito.setStockActual(stockActual - aDescontar);
+                depositoRepository.save(deposito);
+            }
             metricasService.incrementarStockMovimiento("baja");
 
             restante -= aDescontar;
@@ -551,7 +555,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
     public Integer stockDisponibleDeProducto(String productoId) {
         List<StockDeposito> stocks = stockDepositoRepository.findByProductoid(productoId);
         return stocks.stream()
-                .mapToInt(StockDeposito::getCantidad)
+                .mapToInt(s -> s.getCantidad() != null ? s.getCantidad() : 0)
                 .sum();
     }
 
