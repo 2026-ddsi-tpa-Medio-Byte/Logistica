@@ -115,6 +115,12 @@
       <artifactId>spring-boot-starter-amqp</artifactId>
     </dependency>
 
+    <dependency>
+      <groupId>org.codehaus.janino</groupId>
+      <artifactId>janino</artifactId>
+      <version>3.1.12</version>
+    </dependency>
+
   </dependencies>
 
   <build>

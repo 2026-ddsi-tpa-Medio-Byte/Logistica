@@ -15,6 +15,13 @@ public class GlobalExceptionHandler {
         this.metricasService = metricasService;
     }
 
+    @ExceptionHandler(java.util.NoSuchElementException.class)
+    public ResponseEntity<String> handleNotFound(java.util.NoSuchElementException ex) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> handleGenericException(Exception ex) {
         metricasService.incrementarAsignacionesErrores();

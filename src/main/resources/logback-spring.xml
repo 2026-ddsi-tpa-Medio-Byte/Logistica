@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!--
+      Consola: siempre activa. Incluye el traceId/instanceId/requestId del MDC
+      para poder correlacionar tambien mirando los logs crudos de Render.
+    -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [trace=%X{traceId} instance=%X{instanceId} req=%X{requestId}] - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!--
+      Appender de Datadog: se activa SOLO si la variable de entorno DATADOG_API_KEY
+      esta definida. Asi el proyecto arranca normal en local sin mandar nada a Datadog.
+
+      El envio es asincronico y en lotes (ver DatadogLogAppender): nunca bloquea el
+      hilo de negocio, y si Datadog falla, descarta los logs.
+    -->
+    <if condition='isDefined("DATADOG_API_KEY")'>
+        <then>
+            <appender name="DATADOG" class="ar.edu.utn.dds.k3003.zAlumno.logging.DatadogLogAppender">
+                <apiKey>${DATADOG_API_KEY}</apiKey>
+                <site>${DATADOG_SITE:-us5.datadoghq.com}</site>
+                <service>${DD_SERVICE:-logistica}</service>
+                <source>java</source>
+                <host>${DD_INSTANCIA:-render}</host>
+                <batchSize>500</batchSize>
+                <flushIntervalMs>5000</flushIntervalMs>
+                <queueCapacity>10000</queueCapacity>
+            </appender>
+            <root level="INFO">
+                <appender-ref ref="CONSOLE"/>
+                <appender-ref ref="DATADOG"/>
+            </root>
+        </then>
+        <else>
+            <root level="INFO">
+                <appender-ref ref="CONSOLE"/>
+            </root>
+        </else>
+    </if>
+
+</configuration>

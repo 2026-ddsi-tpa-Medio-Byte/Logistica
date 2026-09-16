@@ -306,6 +306,10 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
     public void agregarAlStock(String depositoId, String productoId, Integer cantidad){
 
         Deposito deposito = buscarDepositoID(depositoId);
+        if (deposito == null) {
+            System.out.println("[STOCK] Depósito no encontrado, se descarta: " + depositoId);
+            return;
+        }
 
         if(deposito.estaLleno()){
             System.out.println("Deposito lleno, se descarto el sobrante");
@@ -344,6 +348,9 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
 
     public void setAlgoritmoMM(String depositoid, LogisticaDTOs.TipoAlgoritmoEnum algoritmo){
         Deposito deposito = buscarDepositoID(depositoid);
+        if (deposito == null) {
+            throw new NoSuchElementException("Depósito no encontrado: " + depositoid);
+        }
         deposito.setAlgoritmo(algoritmo);
         depositoRepository.save(deposito);
     }
@@ -427,6 +434,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         // caso: sin necesidades guarda en stock
         if (necesidadesDelProducto == null || necesidadesDelProducto.isEmpty()) {
             agregarAlStock(depositoid, productoid, cantidad);
+            metricasService.incrementarDonacionGestionada("stock");
             System.out.println("[WORKER] Sin necesidades, guardado en stock: " + depositoid);
             return;
         }
@@ -444,6 +452,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         // caso: todas eran recurrentes insuficientes van al stock
         if (listaFiltrada.isEmpty()) {
             agregarAlStock(depositoid, productoid, cantidad);
+            metricasService.incrementarDonacionGestionada("stock");
             System.out.println("[WORKER] Solo recurrentes insuficientes, guardado en stock");
             return;
         }
@@ -493,6 +502,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         Asignacion nuevaAsignacion = new Asignacion(asignacionFinal);
         asignacionRepository.save(nuevaAsignacion);
         metricasService.incrementarAsignacionesCreadas();
+        metricasService.incrementarDonacionGestionada("asignada");
 
         if (sobrante > 0) {
             agregarAlStock(depositoid, productoid, sobrante);
@@ -566,6 +576,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         // verifica que haya stock suficiente del producto
         Integer disponible = stockDisponibleDeProducto(productoID);
         if (disponible < cantidad) {
+            metricasService.incrementarSolicitudDirecta("sin_stock");
             throw new RuntimeException("Stock insuficiente. Disponible: " + disponible + ", solicitado: " + cantidad);
         }
 
@@ -588,6 +599,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         Asignacion nuevaAsignacion = new Asignacion(asignacionDTO);
         asignacionRepository.save(nuevaAsignacion);
 
+        metricasService.incrementarSolicitudDirecta("ok");
         return asignacionDTO;
     }
 
@@ -619,6 +631,33 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                     return new LogisticaDTOs.StockDetalladoDTO(e.getKey(), porDep, total);
                 })
                 .collect(Collectors.toList());
+    }
+
+    //Gauge stock actual
+    public double stockTotalActual() {
+        return depositoRepository.findAll().stream()
+                .mapToInt(d -> d.getStockActual() != null ? d.getStockActual() : 0)
+                .sum();
+    }
+
+    //Gauge ocupacion promedio
+    public double ocupacionPromedio() {
+        var depositos = depositoRepository.findAll();
+        if (depositos.isEmpty()) {
+            return 0.0;
+        }
+        double sumaPorcentajes = 0.0;
+        int contados = 0;
+        for (var d : depositos) {
+            Integer cap = d.getCapacidadMaxima();
+            if (cap == null || cap == 0) {
+                continue; // evita división por cero
+            }
+            int stock = d.getStockActual() != null ? d.getStockActual() : 0;
+            sumaPorcentajes += (stock * 100.0) / cap;
+            contados++;
+        }
+        return contados == 0 ? 0.0 : sumaPorcentajes / contados;
     }
 
     public void limpiarTodaLaBase() {
