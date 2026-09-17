@@ -71,19 +71,19 @@ public class MetricasService {
     //GAUGES estado actual
 
     //Stock total disponible. Lee en vivo del LogisticaService.
-    Gauge.builder("logistica.stock.actual", logisticaService, LogisticaService::stockTotalActual)
+    Gauge.builder("logistica.stock.actual", () -> logisticaService.stockTotalActual())
             .description("Unidades totales en stock en este momento (todos los depósitos)")
             .tag("modulo", "logistica")
             .register(meterRegistry);
 
     //Ocupación promedio de los depósitos AHORA (0 a 100)
-    Gauge.builder("logistica.deposito.ocupacion", logisticaService, LogisticaService::ocupacionPromedio)
+    Gauge.builder("logistica.deposito.ocupacion", () -> logisticaService.ocupacionPromedio())
             .description("Porcentaje de ocupación promedio de los depósitos")
             .tag("modulo", "logistica")
             .register(meterRegistry);
 
     //Donaciones pendientes en la cola
-    Gauge.builder("logistica.cola.pendientes", this, MetricasService::colaPendientes)
+    Gauge.builder("logistica.cola.pendientes", () -> this.colaPendientes())
             .description("Donaciones esperando ser procesadas por los workers")
             .tag("modulo", "logistica")
             .register(meterRegistry);
