@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -56,6 +57,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleIntegracion(IntegracionException ex) {
         log.error("Fallo de integracion: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(ex.getMessage());
+    }
+
+    // Request a una ruta que no existe (health check o UptimeRobot pegandole a "/",
+    // favicon, etc). No es un error de negocio: se responde 404 sin loguear ERROR,
+    // para no ensuciar el log central ni disparar alarmas de errores por los pings.
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Void> handleNoResource(NoResourceFoundException ex) {
+        return ResponseEntity.notFound().build();
     }
 
     @ExceptionHandler(Exception.class)
