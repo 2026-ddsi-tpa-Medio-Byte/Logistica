@@ -6,7 +6,16 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "asignaciones")
+@Table(
+        name = "asignaciones",
+        // Evita la asignacion DUPLICADA (misma donacion + misma necesidad), que aparece
+        // cuando Rabbit reentrega el mismo mensaje o dos workers lo toman a la vez.
+        // NO se usa paqueteid solo: la consigna permite 2 paquetes con el mismo donacionID
+        // (una donacion repartida entre necesidades distintas), y eso debe seguir siendo valido.
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_asignacion_donacion_necesidad",
+                columnNames = {"donacionid", "necesidadid"})
+)
 public class Asignacion {
 
     @Id

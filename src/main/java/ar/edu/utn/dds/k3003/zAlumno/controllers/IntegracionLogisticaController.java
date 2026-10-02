@@ -28,12 +28,12 @@ public class IntegracionLogisticaController {
   @PostMapping("/depositos")
   public ResponseEntity<DepositoDTO> crearDeposito(@RequestBody DepositoDTO depositoDTO) {
     LogisticaDTOs.DepositoDTO nuevo = new LogisticaDTOs.DepositoDTO(
-        depositoDTO.nombre(),
-        depositoDTO.id(),
-        depositoDTO.direccion(),
-        depositoDTO.capacidadMaxima(),
-        0,
-        aTipoAlgoritmoLocal(depositoDTO.algoritmo()));
+            depositoDTO.nombre(),
+            depositoDTO.id(),
+            depositoDTO.direccion(),
+            depositoDTO.capacidadMaxima(),
+            0,
+            aTipoAlgoritmoLocal(depositoDTO.algoritmo()));
     LogisticaDTOs.DepositoDTO guardado = logisticaService.agregarDeposito(nuevo);
     return ResponseEntity.status(HttpStatus.CREATED).body(aDepositoDTOCatedra(guardado));
   }
@@ -42,8 +42,8 @@ public class IntegracionLogisticaController {
   @GetMapping("/depositos")
   public ResponseEntity<List<DepositoDTO>> obtenerDepositos() {
     List<DepositoDTO> depositos = logisticaService.obtenerTodosDepositosDTO().stream()
-        .map(IntegracionLogisticaController::aDepositoDTOCatedra)
-        .toList();
+            .map(IntegracionLogisticaController::aDepositoDTOCatedra)
+            .toList();
     return ResponseEntity.ok(depositos);
   }
 
@@ -60,11 +60,16 @@ public class IntegracionLogisticaController {
   @Operation(summary = "Recibe una donación desde el módulo Donaciones")
   @PostMapping("/asignaciones")
   public ResponseEntity<DepositoDTO> gestionarDonacion(@RequestBody LogisticaDTOs.GestionDonacionDTO body) {
-    LogisticaDTOs.GestionDonacionResponseDTO resultado = logisticaService.gestionarDonacion(
-        body.depositoID(), body.donacionID(), body.productoID(), body.cantidad());
-    if (resultado == null) {
-      return ResponseEntity.notFound().build();
+    // 400: la cantidad tiene que ser positiva (antes respondia 200 sin encolar nada)
+    if (body.cantidad() == null || body.cantidad() <= 0) {
+      throw new IllegalArgumentException("La cantidad debe ser mayor a 0");
     }
+    // 404: el deposito tiene que existir (antes daba NullPointerException y 500)
+    if (logisticaService.buscarDepositoID(body.depositoID()) == null) {
+      throw new java.util.NoSuchElementException("Deposito no encontrado: " + body.depositoID());
+    }
+    LogisticaDTOs.GestionDonacionResponseDTO resultado = logisticaService.gestionarDonacion(
+            body.depositoID(), body.donacionID(), body.productoID(), body.cantidad());
     return ResponseEntity.ok(aDepositoDTOCatedra(resultado.deposito()));
   }
 
@@ -76,11 +81,11 @@ public class IntegracionLogisticaController {
       return ResponseEntity.notFound().build();
     }
     return ResponseEntity.ok(new AsignacionDTO(
-        asignacion.asignacionid(),
-        asignacion.paqueteid(),
-        asignacion.necesidadid(),
-        asignacion.fecha(),
-        ar.edu.utn.dds.k3003.catedra.dtos.logistica.EstadoAsginacionEnum.valueOf(asignacion.estado().name())));
+            asignacion.asignacionid(),
+            asignacion.paqueteid(),
+            asignacion.necesidadid(),
+            asignacion.fecha(),
+            ar.edu.utn.dds.k3003.catedra.dtos.logistica.EstadoAsginacionEnum.valueOf(asignacion.estado().name())));
   }
 
   @Operation(summary = "Consulta el stock disponible de un producto")
@@ -105,32 +110,31 @@ public class IntegracionLogisticaController {
   @Operation(summary = "Asigna stock directamente a una necesidad por solicitud de Donadores(sin donacion, con lo que hay en stock)")
   @PostMapping("/asignaciones/solicitud")
   public ResponseEntity<AsignacionDTO> asignarPorSolicitud(@RequestBody LogisticaDTOs.SolicitudAsignacionDTO solicitud) {
-    try {
-      LogisticaDTOs.AsignacionDTO asignacion = logisticaService.asignarPorSolicitud(
-              solicitud.necesidadID(),
-              solicitud.productoID(),
-              solicitud.cantidad()
-      );
-      return ResponseEntity.status(HttpStatus.CREATED).body(new AsignacionDTO(
-              asignacion.asignacionid(),
-              asignacion.paqueteid(),
-              asignacion.necesidadid(),
-              asignacion.fecha(),
-              ar.edu.utn.dds.k3003.catedra.dtos.logistica.EstadoAsginacionEnum.valueOf(asignacion.estado().name())
-      ));
-    } catch (RuntimeException e) {
-      return ResponseEntity.status(HttpStatus.CONFLICT).build();
-    }
+    // Sin try/catch: el GlobalExceptionHandler responde 400 (cantidad invalida),
+    // 409 (stock insuficiente) con el motivo en el body, en vez de un 409 vacio para todo.
+    LogisticaDTOs.AsignacionDTO asignacion = logisticaService.asignarPorSolicitud(
+            solicitud.necesidadID(),
+            solicitud.productoID(),
+            solicitud.cantidad(),
+            solicitud.tipo()
+    );
+    return ResponseEntity.status(HttpStatus.CREATED).body(new AsignacionDTO(
+            asignacion.asignacionid(),
+            asignacion.paqueteid(),
+            asignacion.necesidadid(),
+            asignacion.fecha(),
+            ar.edu.utn.dds.k3003.catedra.dtos.logistica.EstadoAsginacionEnum.valueOf(asignacion.estado().name())
+    ));
   }
 
   private static DepositoDTO aDepositoDTOCatedra(LogisticaDTOs.DepositoDTO deposito) {
     return new DepositoDTO(
-        deposito.depositoid(),
-        aTipoAlgoritmoCatedra(deposito.algoritmo()),
-        deposito.nombre(),
-        deposito.direccion(),
-        deposito.capacidadMaxima(),
-        List.of());
+            deposito.depositoid(),
+            aTipoAlgoritmoCatedra(deposito.algoritmo()),
+            deposito.nombre(),
+            deposito.direccion(),
+            deposito.capacidadMaxima(),
+            List.of());
   }
 
   private static TipoAlgoritmoEnum aTipoAlgoritmoCatedra(LogisticaDTOs.TipoAlgoritmoEnum algoritmo) {

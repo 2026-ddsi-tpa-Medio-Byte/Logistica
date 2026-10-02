@@ -1,13 +1,20 @@
 package ar.edu.utn.dds.k3003.zAlumno.services;
 
+import ar.edu.utn.dds.k3003.zAlumno.config.RabbitMQConfig;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.core.AmqpAdmin;
+import org.springframework.amqp.core.QueueInformation;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 @Service
 public class MetricasService {
+
+  private static final Logger log = LoggerFactory.getLogger(MetricasService.class);
 
   private final Counter asignacionesCreadas;
   private final Counter asignacionesErrores;
@@ -17,14 +24,14 @@ public class MetricasService {
   private final Counter asignacionesDuplicadas;
   private final Counter necesidadesSatisfechas;
   private final MeterRegistry meterRegistry;
+  private final AmqpAdmin amqpAdmin;
 
-  // Contadores para calcular la cola pendiente (encoladas - gestionadas).
-  private final java.util.concurrent.atomic.AtomicLong encoladasTotal = new java.util.concurrent.atomic.AtomicLong(0);
-  private final java.util.concurrent.atomic.AtomicLong gestionadasTotal = new java.util.concurrent.atomic.AtomicLong(0);
-
-  public MetricasService(MeterRegistry meterRegistry, @Lazy LogisticaService logisticaService) {
+  public MetricasService(MeterRegistry meterRegistry,
+                         @Lazy LogisticaService logisticaService,
+                         AmqpAdmin amqpAdmin) {
 
     this.meterRegistry = meterRegistry;
+    this.amqpAdmin = amqpAdmin;
 
     this.asignacionesCreadas =
             Counter.builder("logistica.asignaciones.creadas")
@@ -82,9 +89,15 @@ public class MetricasService {
             .tag("modulo", "logistica")
             .register(meterRegistry);
 
-    //Donaciones pendientes en la cola
-    Gauge.builder("logistica.cola.pendientes", () -> this.colaPendientes())
+    //Donaciones pendientes en la cola (leido del broker, igual para todas las instancias)
+    Gauge.builder("logistica.cola.pendientes", () -> this.mensajesEnCola(RabbitMQConfig.COLA_DONACIONES))
             .description("Donaciones esperando ser procesadas por los workers")
+            .tag("modulo", "logistica")
+            .register(meterRegistry);
+
+    //Donaciones que fallaron todos los reintentos y quedaron en la DLQ
+    Gauge.builder("logistica.cola.dlq", () -> this.mensajesEnCola(RabbitMQConfig.COLA_DONACIONES_DLQ))
+            .description("Donaciones que fallaron todos los reintentos")
             .tag("modulo", "logistica")
             .register(meterRegistry);
   }
@@ -107,7 +120,6 @@ public class MetricasService {
 
   public void incrementarDonacionesEncoladas() {
     donacionesEncoladas.increment();
-    encoladasTotal.incrementAndGet();
   }
 
   public void incrementarAsignacionesDuplicadas() {
@@ -138,7 +150,6 @@ public class MetricasService {
 
   /* Donación procesada por el worker. resultado = "asignada" | "stock" | "descartada". */
   public void incrementarDonacionGestionada(String resultado) {
-    gestionadasTotal.incrementAndGet();
     Counter.builder("logistica.donaciones.gestionadas")
             .description("Donaciones procesadas por el worker, por resultado")
             .tag("modulo", "logistica")
@@ -157,11 +168,39 @@ public class MetricasService {
             .increment();
   }
 
-  // Fuente del gauge de cola
+  /* Unidades que no entraron al depósito (lleno o inexistente) y se descartaron. */
+  public void incrementarUnidadesDescartadas(String depositoId, int cantidad) {
+    if (cantidad <= 0) {
+      return;
+    }
+    Counter.builder("logistica.stock.descartadas")
+            .description("Unidades descartadas por falta de espacio en el depósito")
+            .tag("modulo", "logistica")
+            .tag("deposito", depositoId != null ? depositoId : "desconocido")
+            .register(meterRegistry)
+            .increment(cantidad);
+  }
 
-  /* Pendientes = encoladas - gestionadas. Nunca negativo. */
-  public double colaPendientes() {
-    long pend = encoladasTotal.get() - gestionadasTotal.get();
-    return Math.max(pend, 0);
+  /* Fallo al llamar a otro módulo. modulo = "donaciones" | "donadoresyentidades". */
+  public void incrementarFalloIntegracion(String modulo, String operacion) {
+    Counter.builder("logistica.integracion.fallos")
+            .description("Llamadas fallidas a otros módulos")
+            .tag("modulo", "logistica")
+            .tag("destino", modulo)
+            .tag("operacion", operacion)
+            .register(meterRegistry)
+            .increment();
+  }
+
+  // Fuente de los gauges de cola: se le pregunta al broker cuántos mensajes hay.
+  // Devuelve NaN si no se puede consultar, para que Datadog no lo tome como un 0 real.
+  public double mensajesEnCola(String cola) {
+    try {
+      QueueInformation info = amqpAdmin.getQueueInfo(cola);
+      return info != null ? info.getMessageCount() : Double.NaN;
+    } catch (Exception e) {
+      log.debug("No se pudo leer el tamaño de la cola {}: {}", cola, e.getMessage());
+      return Double.NaN;
+    }
   }
 }

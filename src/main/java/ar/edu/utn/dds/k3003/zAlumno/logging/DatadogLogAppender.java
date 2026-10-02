@@ -60,6 +60,9 @@ public class DatadogLogAppender extends AppenderBase<ILoggingEvent> {
         if (!running || queue == null) {
             return;
         }
+        // Congela el evento AHORA (MDC con traceId, mensaje, thread). Sin esto, el MDC
+        // se leeria despues desde el hilo del appender, donde esta vacio.
+        event.prepareForDeferredProcessing();
         // offer() NO bloquea: si la cola esta llena, devuelve false y descartamos
         boolean encolado = queue.offer(event);
         if (!encolado) {
@@ -130,8 +133,16 @@ public class DatadogLogAppender extends AppenderBase<ILoggingEvent> {
                     .append("\"traceId\":\"").append(esc(mdc(e, "traceId"))).append("\",")
                     .append("\"instanceId\":\"").append(esc(mdc(e, "instanceId"))).append("\",")
                     .append("\"requestId\":\"").append(esc(mdc(e, "requestId"))).append("\",")
-                    .append("\"message\":\"").append(esc(e.getFormattedMessage())).append("\"")
-                    .append("}");
+                    .append("\"message\":\"").append(esc(e.getFormattedMessage())).append("\"");
+            // Si el log trae una excepcion, se manda el stack trace en los campos que Datadog reconoce
+            if (e.getThrowableProxy() != null) {
+                sb.append(",\"error.kind\":\"").append(esc(e.getThrowableProxy().getClassName())).append("\"")
+                        .append(",\"error.message\":\"").append(esc(e.getThrowableProxy().getMessage())).append("\"")
+                        .append(",\"error.stack\":\"")
+                        .append(esc(ch.qos.logback.classic.spi.ThrowableProxyUtil.asString(e.getThrowableProxy())))
+                        .append("\"");
+            }
+            sb.append("}");
         }
         sb.append("]");
         return sb.toString();

@@ -81,14 +81,15 @@ public class LogisticaController {
             @RequestParam String productoid,
             @RequestParam Integer cantidad) {
 
-        try {
-            LogisticaDTOs.GestionDonacionResponseDTO resultado = logisticaService.gestionarDonacion(depositoid, donacionid, productoid, cantidad);
-            metricasService.incrementarAsignacionesCreadas();
-            return ResponseEntity.ok(resultado);
-        } catch (Exception e) {
-            metricasService.incrementarAsignacionesErrores();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        if (cantidad == null || cantidad <= 0) {
+            throw new IllegalArgumentException("La cantidad debe ser mayor a 0");
         }
+        if (logisticaService.buscarDepositoID(depositoid) == null) {
+            throw new java.util.NoSuchElementException("Deposito no encontrado: " + depositoid);
+        }
+        LogisticaDTOs.GestionDonacionResponseDTO resultado = logisticaService.gestionarDonacion(depositoid, donacionid, productoid, cantidad);
+        // la asignacion la crea (y la cuenta) el worker; aca solo se encolo
+        return ResponseEntity.ok(resultado);
     }
 
     @GetMapping("/necesidades/{id}")
@@ -164,19 +165,52 @@ public class LogisticaController {
                     "Asignación ya completada", asignacion.asignacionid()));
         }
 
-        try {
-            LogisticaDTOs.ReporteEntregaResponseDTO resultado =
-                    logisticaService.reportarEntrega(request.paqueteid());
-            metricasService.incrementarEntregasReportadas();
-            return ResponseEntity.ok(resultado);
-        } catch (Exception e) {
-            metricasService.incrementarAsignacionesErrores();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new LogisticaDTOs.ReporteEntregaResponseDTO(
-                            "Error al procesar la entrega: " + e.getMessage(),
-                            null,
-                            null,
-                            null));
-        }
+        // Si falla otro modulo, reportarEntrega tira IntegracionException y el
+        // GlobalExceptionHandler responde 502: la asignacion sigue ASIGNADA y se puede reintentar.
+        LogisticaDTOs.ReporteEntregaResponseDTO resultado =
+                logisticaService.reportarEntrega(request.paqueteid());
+        metricasService.incrementarEntregasReportadas();
+        return ResponseEntity.ok(resultado);
+    }
+
+    // ---------- 18: modificacion y baja de depositos ----------
+
+    @Operation(summary = "Modifica nombre, direccion, capacidad y algoritmo de un deposito (el stock no se toca)")
+    @PutMapping("/depositos/{id}")
+    public ResponseEntity<LogisticaDTOs.DepositoDTO> modificarDeposito(
+            @PathVariable String id,
+            @RequestBody LogisticaDTOs.DepositoDTO datos) {
+        return ResponseEntity.ok(logisticaService.modificarDeposito(id, datos));
+    }
+
+    @Operation(summary = "Elimina un deposito. Solo si no tiene stock")
+    @DeleteMapping("/depositos/{id}")
+    public ResponseEntity<Void> eliminarDeposito(@PathVariable String id) {
+        logisticaService.eliminarDeposito(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ---------- 19: consultas de asignaciones ----------
+
+    @Operation(summary = "Lista asignaciones. Filtros opcionales: estado (ASIGNADA/COMPLETADA) y necesidadid")
+    @GetMapping("/asignaciones")
+    public ResponseEntity<List<LogisticaDTOs.AsignacionDTO>> listarAsignaciones(
+            @RequestParam(required = false) LogisticaDTOs.EstadoAsginacionEnum estado,
+            @RequestParam(required = false) String necesidadid) {
+        return ResponseEntity.ok(logisticaService.listarAsignaciones(estado, necesidadid));
+    }
+
+    @Operation(summary = "Asignaciones generadas a partir de una donacion")
+    @GetMapping("/asignaciones/donaciones/{donacionId}")
+    public ResponseEntity<List<LogisticaDTOs.AsignacionDTO>> asignacionesDeDonacion(@PathVariable String donacionId) {
+        return ResponseEntity.ok(logisticaService.asignacionesDeDonacion(donacionId));
+    }
+
+    // ---------- 20: stock de un deposito ----------
+
+    @Operation(summary = "Stock de un deposito, desglosado por producto")
+    @GetMapping("/depositos/{id}/stock")
+    public ResponseEntity<List<LogisticaDTOs.StockProductoDTO>> stockDeDeposito(@PathVariable String id) {
+        return ResponseEntity.ok(logisticaService.stockDeDeposito(id));
     }
 }

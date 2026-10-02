@@ -18,6 +18,13 @@ public class Deposito {
     @Enumerated(EnumType.STRING)
     private TipoAlgoritmoEnum algoritmo;
 
+    // Lock optimista: Hibernate agrega "AND version = ?" a cada UPDATE. Si otro worker
+    // modifico el deposito en el medio, el UPDATE no afecta filas y tira excepcion
+    // en vez de pisar el cambio del otro.
+    @Version
+    @Column(columnDefinition = "bigint default 0 not null")
+    private Long version;
+
     public Deposito() {
     }
 
@@ -38,6 +45,10 @@ public class Deposito {
     public Integer getCapacidadMaxima() { return capacidadMaxima; }
     public Integer getStockActual() { return stockActual; }
     public void setStockActual(Integer stockactual) { this.stockActual = stockactual; }
+    public void setNombre(String nombre) { this.nombre = nombre; }
+    public void setDireccion(String direccion) { this.direccion = direccion; }
+    public void setCapacidadMaxima(Integer capacidadMaxima) { this.capacidadMaxima = capacidadMaxima; }
+    public Long getVersion() { return version; }
     public void agregarAlStock(Integer cantidad) { this.stockActual = this.stockActual + cantidad; }
     public boolean estaLleno() { return stockActual >= capacidadMaxima; }
     public int espacioDisponible() { return capacidadMaxima - stockActual; }

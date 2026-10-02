@@ -69,19 +69,25 @@ public class LogisticaDTOs {
             String necesidadID,
             String productoID,
             Integer cantidad,
-            String origen
+            String origen,
+            String tipo   // opcional: EXTRAORDINARIA permite asignacion parcial
     ) {}
 
     public record GestionDonacionDTO(
-         String depositoID,
-         String donacionID,
-         String productoID,
-         Integer cantidad
+            String depositoID,
+            String donacionID,
+            String productoID,
+            Integer cantidad
     ){}
 
     public record StockPorDepositoDTO(
             String depositoid,
             Integer disponibleEnDeposito
+    ) {}
+
+    public record StockProductoDTO(
+            String productoid,
+            Integer cantidad
     ) {}
 
     public record StockDetalladoDTO(
