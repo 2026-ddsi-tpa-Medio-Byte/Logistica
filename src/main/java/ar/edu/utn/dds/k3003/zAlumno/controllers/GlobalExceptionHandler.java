@@ -53,10 +53,14 @@ public class GlobalExceptionHandler {
     }
 
     // 502: fallo otro modulo; la operacion no se completo y se puede reintentar
+    // El body va como JSON {"error": "..."}: es el formato con el que los modulos de DonaTrack
+    // avisan "yo conteste, el que fallo es otro modulo". Con texto plano, el MCP confunde este
+    // 502 con el 502 que da Render cuando el servicio esta dormido.
     @ExceptionHandler(IntegracionException.class)
-    public ResponseEntity<String> handleIntegracion(IntegracionException ex) {
+    public ResponseEntity<java.util.Map<String, String>> handleIntegracion(IntegracionException ex) {
         log.error("Fallo de integracion: {}", ex.getMessage(), ex);
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(java.util.Map.of("error", ex.getMessage()));
     }
 
     // Request a una ruta que no existe (health check o UptimeRobot pegandole a "/",
