@@ -22,6 +22,7 @@ import ar.edu.utn.dds.k3003.zAlumno.repositorires.Logistica.AsignacionRepository
 import ar.edu.utn.dds.k3003.zAlumno.repositorires.Logistica.DepositoRepository;
 import ar.edu.utn.dds.k3003.zAlumno.repositorires.Logistica.StockDepositoRepository;
 import ar.edu.utn.dds.k3003.zAlumno.entidades.Logistica.StockDeposito;
+import ar.edu.utn.dds.k3003.zAlumno.eventos.PublicadorEventos;
 import ar.edu.utn.dds.k3003.zAlumno.exceptions.IntegracionException;
 import ar.edu.utn.dds.k3003.zAlumno.logging.TraceIdFilter;
 import org.slf4j.Logger;
@@ -35,7 +36,9 @@ import java.util.NoSuchElementException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -78,6 +81,10 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
 
     @Autowired
     private MetricasService metricasService;
+
+    // Entrega 6: eventos para el modelo de lectura (se envian a RabbitMQ despues del commit)
+    @Autowired
+    private PublicadorEventos publicadorEventos;
 
     public LogisticaService(){
 
@@ -181,7 +188,8 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 depositoDTO.algoritmo() != null ? depositoDTO.algoritmo() : LogisticaDTOs.TipoAlgoritmoEnum.NULL
         );
 
-        depositoRepository.save(new Deposito(dtoConId));
+        Deposito creado = depositoRepository.save(new Deposito(dtoConId));
+        publicadorEventos.depositoCreado(creado);
         log.info("Deposito {} creado (capacidad={}, algoritmo={})", id, dtoConId.capacidadMaxima(), dtoConId.algoritmo());
         return buscarDepositoIDDTO(id);
     }
@@ -223,6 +231,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         // se borran las filas de stock en 0 que quedaron de ese deposito, para no dejar huerfanos
         stockDepositoRepository.deleteAll(stockDepositoRepository.findByDepositoid(depositoid));
         depositoRepository.delete(deposito);
+        publicadorEventos.depositoEliminado(deposito);
         log.info("Deposito {} eliminado", depositoid);
     }
 
@@ -250,7 +259,8 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         if (nuevosDatos.algoritmo() != null) {
             deposito.setAlgoritmo(nuevosDatos.algoritmo());
         }
-        depositoRepository.save(deposito);
+        Deposito modificado = depositoRepository.save(deposito);
+        publicadorEventos.depositoModificado(modificado);
         log.info("Deposito {} modificado", depositoid);
         return buscarDepositoIDDTO(depositoid);
     }
@@ -289,17 +299,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             return null;
         }
 
-        return new LogisticaDTOs.AsignacionDTO(
-                asig.getId(),
-                asig.getpaqueteId(),
-                asig.getNecesidadId(),
-                asig.getfecha(),
-                asig.getEstado(),
-                asig.getOrigen(),
-                asig.getDonacionid(),
-                asig.getProductoid(),
-                asig.getCantidad()
-        );
+        return aAsignacionDTO(asig);
     }
 
     @Override
@@ -347,15 +347,23 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 .collect(Collectors.toList());
     }
 
-    private void descontarStock(String productoID, Integer cantidad) {
+    // Devuelve el deposito del que salieron mas unidades: si la solicitud se cubre con stock de
+    // varios depositos, la asignacion queda asociada al principal (la asignacion tiene un solo depositoid).
+    private String descontarStock(String productoID, Integer cantidad) {
         List<StockDeposito> stocks = stockDepositoRepository.findByProductoid(productoID);
         int restante = cantidad;
+        String depositoPrincipal = null;
+        int mayorDescuento = 0;
 
         for (StockDeposito stock : stocks) {
             if (restante <= 0) break;
 
             int cantidadStock = stock.getCantidad() != null ? stock.getCantidad() : 0;
             int aDescontar = Math.min(cantidadStock, restante);
+            if (aDescontar > mayorDescuento) {
+                mayorDescuento = aDescontar;
+                depositoPrincipal = stock.getDepositoid();
+            }
             stock.setCantidad(cantidadStock - aDescontar);
             stockDepositoRepository.save(stock);
 
@@ -366,10 +374,14 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 deposito.setStockActual(stockActual - aDescontar);
                 depositoRepository.save(deposito);
             }
+            if (aDescontar > 0) { // una fila que ya estaba en 0 no cambia: no hay nada que avisar
+                publicadorEventos.stockActualizado(stock, deposito);
+            }
             metricasService.incrementarStockMovimiento("baja");
 
             restante -= aDescontar;
         }
+        return depositoPrincipal;
     }
 
     @Override
@@ -409,6 +421,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
 
         }
         stockDepositoRepository.save(stock);
+        publicadorEventos.stockActualizado(stock, deposito);
         metricasService.incrementarStockMovimiento("alta");
 
         if (cantidadAGuardar < cantidad) {
@@ -427,7 +440,8 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             throw new NoSuchElementException("Depósito no encontrado: " + depositoid);
         }
         deposito.setAlgoritmo(algoritmo);
-        depositoRepository.save(deposito);
+        Deposito modificado = depositoRepository.save(deposito);
+        publicadorEventos.depositoModificado(modificado);
         log.info("Deposito {} configurado con algoritmo {}", depositoid, algoritmo);
     }
 
@@ -440,6 +454,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             return new LogisticaDTOs.GestionDonacionResponseDTO(
                     "Cantidad insuficiente, no se encoló",
                     buscarDepositoIDDTO(depositoid),
+                    null,
                     null
             );
         }
@@ -450,6 +465,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             log.warn("Donacion {} rechazada: deposito {} no existe", donacionid, depositoid);
             return new LogisticaDTOs.GestionDonacionResponseDTO(
                     "Deposito id: " + depositoid + " no encontrado",
+                    null,
                     null,
                     null
             );
@@ -468,12 +484,19 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         metricasService.incrementarDonacionesEncoladas();
         log.info("Donacion {} encolada (deposito={}, producto={}, cantidad={})", donacionid, depositoid, productoid, cantidad);
 
-        // respuesta
+        // respuesta: la asignacion todavia no existe (la crea el worker), pero el paqueteid ya se
+        // conoce, asi el cliente puede consultarla o reportar la entrega despues
         return new LogisticaDTOs.GestionDonacionResponseDTO(
                 "Donación encolada, será procesada por un worker",
                 buscarDepositoIDDTO(depositoid),
-                null
+                null,
+                paqueteIdDeDonacion(donacionid)
         );
+    }
+
+    // Un solo lugar para el formato del paqueteid de una donacion (lo usan la respuesta y el worker)
+    private static String paqueteIdDeDonacion(String donacionid) {
+        return "paq-" + donacionid;
     }
 
     public LogisticaDTOs.AsignacionDTO ejecutarMatchmaking(String depositoid, LogisticaDTOs.PaqueteDTO paquete, List<DonacionYEntiDTOs.NecesidadMaterialDTO> listaNecesidadMaterialDTO){
@@ -498,7 +521,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
 
         // crea el paquete
         LogisticaDTOs.PaqueteDTO paqueteMatch = new LogisticaDTOs.PaqueteDTO(
-                "paq-" + donacionid,
+                paqueteIdDeDonacion(donacionid),
                 donacionid,
                 productoid,
                 cantidad
@@ -599,10 +622,13 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 asignacion.origen(),
                 donacionid,
                 productoid,
-                cantidadAsignada
+                cantidadAsignada,
+                depositoid,
+                null
         );
         Asignacion nuevaAsignacion = new Asignacion(asignacionFinal);
         asignacionRepository.save(nuevaAsignacion);
+        publicadorEventos.asignacionCreada(nuevaAsignacion);
         metricasService.incrementarAsignacionesCreadas();
         metricasService.incrementarDonacionGestionada("asignada");
 
@@ -679,9 +705,11 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
             }
         }
 
-        // 3) recien ahora se completa la asignacion
+        // 3) recien ahora se completa la asignacion y se registra cuando se entrego
         asignacion.setEstado(LogisticaDTOs.EstadoAsginacionEnum.COMPLETADA);
+        asignacion.setFechaEntrega(java.time.LocalDateTime.now());
         asignacionRepository.save(asignacion);
+        publicadorEventos.asignacionCompletada(asignacion);
 
         log.info("Entrega reportada: paquete {}, asignacion {}, necesidad {}, {} unidades",
                 paqueteid, asignacion.getId(), asignacion.getNecesidadId(), cantidadAEntregar);
@@ -695,10 +723,33 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
     }
 
 
+    // Si no mandan asignacionid o paqueteid se generan (antes, sin asignacionid el save fallaba
+    // porque es el @Id, y sin paqueteid no se podia reportar la entrega). Devuelve lo guardado.
     public LogisticaDTOs.AsignacionDTO altaAsignacion(LogisticaDTOs.AsignacionDTO asignacionDTO) {
-        Asignacion nuevaAsignacion = new Asignacion(asignacionDTO);
+        String asignacionid = asignacionDTO.asignacionid() != null && !asignacionDTO.asignacionid().isBlank()
+                ? asignacionDTO.asignacionid()
+                : java.util.UUID.randomUUID().toString();
+        String paqueteid = asignacionDTO.paqueteid() != null && !asignacionDTO.paqueteid().isBlank()
+                ? asignacionDTO.paqueteid()
+                : "paq-alta-" + java.util.UUID.randomUUID();
+
+        LogisticaDTOs.AsignacionDTO dtoConIds = new LogisticaDTOs.AsignacionDTO(
+                asignacionid,
+                paqueteid,
+                asignacionDTO.necesidadid(),
+                asignacionDTO.fecha(),
+                asignacionDTO.estado(),
+                asignacionDTO.origen(),
+                asignacionDTO.donacionid(),
+                asignacionDTO.productoid(),
+                asignacionDTO.cantidad(),
+                asignacionDTO.depositoid(),
+                asignacionDTO.fechaEntrega()
+        );
+        Asignacion nuevaAsignacion = new Asignacion(dtoConIds);
         asignacionRepository.save(nuevaAsignacion);
-        return asignacionDTO;
+        publicadorEventos.asignacionCreada(nuevaAsignacion);
+        return aAsignacionDTO(nuevaAsignacion);
     }
 
     public Integer stockDisponibleDeProducto(String productoId) {
@@ -740,7 +791,7 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         }
 
         // descuenta del stock (de los depósitos que tengan ese producto)
-        descontarStock(productoID, cantidad);
+        String depositoPrincipal = descontarStock(productoID, cantidad);
 
         // crea la asignación con origen solicitud donadores
         LogisticaDTOs.AsignacionDTO asignacionDTO = new LogisticaDTOs.AsignacionDTO(
@@ -752,11 +803,14 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 LogisticaDTOs.OrigenAsignacionEnum.SOLICITUD_DONADORES,
                 null,
                 productoID,
-                cantidad
+                cantidad,
+                depositoPrincipal,
+                null
         );
 
         Asignacion nuevaAsignacion = new Asignacion(asignacionDTO);
         asignacionRepository.save(nuevaAsignacion);
+        publicadorEventos.asignacionCreada(nuevaAsignacion);
 
         metricasService.incrementarSolicitudDirecta("ok");
         log.info("Asignacion {} creada desde stock para la necesidad {}: {} unidades de {}",
@@ -819,7 +873,8 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
     private LogisticaDTOs.AsignacionDTO aAsignacionDTO(Asignacion a) {
         return new LogisticaDTOs.AsignacionDTO(
                 a.getId(), a.getpaqueteId(), a.getNecesidadId(), a.getfecha(), a.getEstado(),
-                a.getOrigen(), a.getDonacionid(), a.getProductoid(), a.getCantidad());
+                a.getOrigen(), a.getDonacionid(), a.getProductoid(), a.getCantidad(),
+                a.getDepositoid(), a.getFechaEntrega());
     }
 
     // ---------- 20: stock de un deposito ----------
@@ -860,12 +915,47 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         return contados == 0 ? 0.0 : sumaPorcentajes / contados;
     }
 
+    // @Transactional: se borra todo o nada, y MODULO_RESETEADO sale recien cuando el borrado se confirmo
+    @Transactional
     public void limpiarTodaLaBase() {
         stockDepositoRepository.deleteAll();
         asignacionRepository.deleteAll();
         necesidaddematerialRepository.deleteAll();
         depositoRepository.deleteAll();
+        publicadorEventos.moduloReseteado();
         log.warn("Base de datos de Logistica reseteada por completo");
+    }
+
+    // Vuelve a publicar el estado actual de todo el modulo (depositos, stock y asignaciones),
+    // para reconstruir el modelo de lectura si quedo desincronizado. No modifica nada.
+    // Cada evento sale con ocurridoEn = ahora, asi pisa lo que el consumidor tenga guardado.
+    @Transactional(readOnly = true)
+    public Map<String, Integer> republicarEventos() {
+        List<Deposito> depositos = depositoRepository.findAll();
+        depositos.forEach(publicadorEventos::depositoCreado);
+
+        // el evento de stock lleva el stock total y la capacidad del deposito
+        Map<String, Deposito> depositosPorId = depositos.stream()
+                .collect(Collectors.toMap(Deposito::getId, d -> d));
+        List<StockDeposito> stocks = stockDepositoRepository.findAll();
+        stocks.forEach(s -> publicadorEventos.stockActualizado(s, depositosPorId.get(s.getDepositoid())));
+
+        List<Asignacion> asignaciones = asignacionRepository.findAll();
+        for (Asignacion a : asignaciones) {
+            if (a.getEstado() == LogisticaDTOs.EstadoAsginacionEnum.COMPLETADA) {
+                publicadorEventos.asignacionCompletada(a);
+            } else {
+                publicadorEventos.asignacionCreada(a);
+            }
+        }
+
+        log.info("Republicados {} depositos, {} filas de stock y {} asignaciones",
+                depositos.size(), stocks.size(), asignaciones.size());
+        Map<String, Integer> resumen = new LinkedHashMap<>();
+        resumen.put("depositos", depositos.size());
+        resumen.put("stock", stocks.size());
+        resumen.put("asignaciones", asignaciones.size());
+        return resumen;
     }
 
 }

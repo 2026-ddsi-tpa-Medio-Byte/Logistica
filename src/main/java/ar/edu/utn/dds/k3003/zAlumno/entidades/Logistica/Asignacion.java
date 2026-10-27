@@ -29,6 +29,11 @@ public class Asignacion {
     private String donacionid;
     private String productoid;
     private Integer cantidad;
+    // Entrega 6: deposito desde donde sale la asignacion y fecha en que se reporto la entrega.
+    // Los necesita el modelo de lectura (consulta 3: estado de los depositos y tiempo ingreso-entrega).
+    // Son nullable: las asignaciones viejas quedan con null.
+    private String depositoid;
+    private LocalDateTime fechaEntrega;
 
     public Asignacion() {
     }
@@ -43,9 +48,12 @@ public class Asignacion {
         this.donacionid = dto.donacionid();
         this.productoid = dto.productoid();
         this.cantidad = dto.cantidad();
+        this.depositoid = dto.depositoid();
+        this.fechaEntrega = dto.fechaEntrega();
     }
 
     public void setEstado(EstadoAsginacionEnum nuevoestado) { this.estado = nuevoestado; }
+    public void setFechaEntrega(LocalDateTime fechaEntrega) { this.fechaEntrega = fechaEntrega; }
     public String getId() { return asignacionid; }
     public String getpaqueteId() { return paqueteid; }
     public String getNecesidadId() { return necesidadid; }
@@ -55,4 +63,6 @@ public class Asignacion {
     public String getDonacionid() { return donacionid; }
     public String getProductoid() { return productoid; }
     public Integer getCantidad() { return cantidad; }
+    public String getDepositoid() { return depositoid; }
+    public LocalDateTime getFechaEntrega() { return fechaEntrega; }
 }

@@ -40,7 +40,9 @@ public class prioScore implements Algoritmos_Interface {
                 LogisticaDTOs.OrigenAsignacionEnum.MATCHMAKING,
                 paquete.donacionID(),
                 paquete.productoid(),
-                paquete.cantidad()
+                paquete.cantidad(),
+                depositoid,
+                null
         );
     }
 }

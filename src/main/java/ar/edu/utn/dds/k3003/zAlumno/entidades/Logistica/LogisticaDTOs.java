@@ -45,13 +45,16 @@ public class LogisticaDTOs {
             OrigenAsignacionEnum origen,
             String donacionid,
             String productoid,
-            Integer cantidad
+            Integer cantidad,
+            String depositoid,
+            LocalDateTime fechaEntrega   // null mientras la asignacion no se entrego
     ){}
 
     public record GestionDonacionResponseDTO(
             String mensaje,
             DepositoDTO deposito,
-            AsignacionDTO asignacion
+            AsignacionDTO asignacion,
+            String paqueteid   // id del paquete que va a usar el worker; null si no se encolo
     ) {}
 
     public record ReportarEntregaRequestDTO(

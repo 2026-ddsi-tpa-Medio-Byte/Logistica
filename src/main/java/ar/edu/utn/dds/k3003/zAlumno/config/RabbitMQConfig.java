@@ -5,6 +5,7 @@ import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +19,11 @@ public class RabbitMQConfig {
     // Dead letter: adonde van los mensajes que fallaron todos los reintentos
     public static final String DLX_DONACIONES = "donaciones.dlx";
     public static final String COLA_DONACIONES_DLQ = "cola-donaciones.dlq";
+
+    // Entrega 6 (CQRS): exchange donde se publican los eventos para el modelo de lectura.
+    // Topic: el Servicio de Consultas bindea su cola con "logistica.#" (o "#" para todos los modulos).
+    // Logistica no declara ninguna cola: si nadie esta bindeado, RabbitMQ descarta los eventos.
+    public static final String EXCHANGE_EVENTOS = "donatrack.eventos";
 
     @Bean
     public Queue colaDonaciones() {
@@ -40,6 +46,11 @@ public class RabbitMQConfig {
     @Bean
     public Binding bindingDlq() {
         return BindingBuilder.bind(colaDonacionesDlq()).to(donacionesDlx()).with(COLA_DONACIONES_DLQ);
+    }
+
+    @Bean
+    public TopicExchange eventosExchange() {
+        return new TopicExchange(EXCHANGE_EVENTOS, true, false);
     }
 
     @Bean

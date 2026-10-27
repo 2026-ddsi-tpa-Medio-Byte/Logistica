@@ -192,6 +192,17 @@ public class MetricasService {
             .increment();
   }
 
+  /* Eventos CQRS enviados a RabbitMQ. resultado = "ok" | "error". */
+  public void incrementarEventoPublicado(String tipo, String resultado) {
+    Counter.builder("logistica.eventos.publicados")
+            .description("Eventos publicados para el modelo de lectura, por tipo y resultado")
+            .tag("modulo", "logistica")
+            .tag("tipo", tipo)
+            .tag("resultado", resultado)
+            .register(meterRegistry)
+            .increment();
+  }
+
   // Fuente de los gauges de cola: se le pregunta al broker cuántos mensajes hay.
   // Devuelve NaN si no se puede consultar, para que Datadog no lo tome como un 0 real.
   public double mensajesEnCola(String cola) {
