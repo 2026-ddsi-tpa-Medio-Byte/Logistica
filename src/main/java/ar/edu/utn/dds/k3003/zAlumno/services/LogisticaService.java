@@ -86,6 +86,10 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
     @Autowired
     private PublicadorEventos publicadorEventos;
 
+    // Evita que 2 workers (o un worker y Donadores) asignen el mismo producto a la vez
+    @Autowired
+    private LockPorProducto lockPorProducto;
+
     public LogisticaService(){
 
         LogisticaDTOs.DepositoDTO deposito1 = new LogisticaDTOs.DepositoDTO(
@@ -527,6 +531,10 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 cantidad
         );
 
+        // Con 2 workers, otra donacion del mismo producto podria estar asignandose en paralelo a la
+        // misma necesidad. Se espera a que termine antes de leer necesidades y asignaciones pendientes.
+        lockPorProducto.bloquear(productoid);
+
         // busca el depósito
         Deposito deposito = buscarDepositoID(depositoid);
         if (deposito == null) {
@@ -773,6 +781,9 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
         if (cantidad == null || cantidad <= 0) {
             throw new IllegalArgumentException("La cantidad solicitada debe ser mayor a 0");
         }
+
+        // mismo lock que el worker: no asignar stock de un producto mientras otra operacion lo asigna
+        lockPorProducto.bloquear(productoID);
 
         Integer disponible = stockDisponibleDeProducto(productoID);
         boolean aceptaParcial = "EXTRAORDINARIA".equalsIgnoreCase(tipo);

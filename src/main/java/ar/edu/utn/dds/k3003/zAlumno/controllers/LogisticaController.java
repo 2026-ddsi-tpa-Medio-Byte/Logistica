@@ -1,6 +1,5 @@
 package ar.edu.utn.dds.k3003.zAlumno.controllers;
 
-import ar.edu.utn.dds.k3003.zAlumno.entidades.DonacionesYEntidades.DonacionYEntiDTOs;
 import ar.edu.utn.dds.k3003.zAlumno.entidades.Logistica.LogisticaDTOs;
 import ar.edu.utn.dds.k3003.zAlumno.services.LogisticaService;
 import ar.edu.utn.dds.k3003.zAlumno.services.MetricasService;
@@ -90,15 +89,6 @@ public class LogisticaController {
         LogisticaDTOs.GestionDonacionResponseDTO resultado = logisticaService.gestionarDonacion(depositoid, donacionid, productoid, cantidad);
         // la asignacion la crea (y la cuenta) el worker; aca solo se encolo
         return ResponseEntity.ok(resultado);
-    }
-
-    @GetMapping("/necesidades/{id}")
-    public ResponseEntity<DonacionYEntiDTOs.NecesidadMaterialDTO> buscarNecesidadPorID(@PathVariable String id) {
-        DonacionYEntiDTOs.NecesidadMaterialDTO necesidad = logisticaService.buscarNecesidadPorIDDTO(id);
-        if (necesidad == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(necesidad);
     }
 
     @Operation(summary = "Busca una asignación por ID de paquete")
