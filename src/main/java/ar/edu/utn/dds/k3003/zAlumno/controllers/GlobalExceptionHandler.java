@@ -7,8 +7,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.ErrorResponse;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -68,6 +72,16 @@ public class GlobalExceptionHandler {
         log.warn("Request invalido: body ilegible: {}", ex.getMostSpecificCause().getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body("El body del request no es valido: " + ex.getMostSpecificCause().getMessage());
+    }
+
+    // 405 / 415: metodo HTTP no permitido en esa ruta (PATCH /api/depositos) o Content-Type que el
+    // endpoint no acepta (text/plain en vez de JSON). Spring ya trae el codigo correcto en la excepcion
+    // (ErrorResponse); sin este handler caian en el generico y respondian 500.
+    @ExceptionHandler({HttpRequestMethodNotSupportedException.class, HttpMediaTypeNotSupportedException.class})
+    public ResponseEntity<String> handleMetodoOFormatoNoSoportado(Exception ex) {
+        HttpStatusCode status = ((ErrorResponse) ex).getStatusCode();
+        log.warn("Request no soportado ({}): {}", status.value(), ex.getMessage());
+        return ResponseEntity.status(status).body(ex.getMessage());
     }
 
     // 409: el estado actual no permite la operacion (id repetido, deposito con stock, sin stock...)

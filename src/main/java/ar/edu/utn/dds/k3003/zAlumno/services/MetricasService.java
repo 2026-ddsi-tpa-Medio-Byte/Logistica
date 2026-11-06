@@ -4,11 +4,16 @@ import ar.edu.utn.dds.k3003.zAlumno.config.RabbitMQConfig;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.MultiGauge;
+import io.micrometer.core.instrument.Tags;
+import java.util.ArrayList;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.core.QueueInformation;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -25,6 +30,8 @@ public class MetricasService {
   private final Counter necesidadesSatisfechas;
   private final MeterRegistry meterRegistry;
   private final AmqpAdmin amqpAdmin;
+  private final LogisticaService logisticaService;
+  private final MultiGauge ocupacionPorDeposito;
 
   public MetricasService(MeterRegistry meterRegistry,
                          @Lazy LogisticaService logisticaService,
@@ -32,6 +39,15 @@ public class MetricasService {
 
     this.meterRegistry = meterRegistry;
     this.amqpAdmin = amqpAdmin;
+    this.logisticaService = logisticaService;
+
+    // Ocupacion de CADA deposito (0 a 100), con tag "deposito". El gauge logistica.deposito.ocupacion
+    // es el promedio: un deposito lleno con otros vacios no lo movia. Las filas se refrescan cada 10 s
+    // (ver actualizarOcupacionPorDeposito) porque los depositos se crean y se borran.
+    this.ocupacionPorDeposito = MultiGauge.builder("logistica.deposito.ocupacion.porcentaje")
+            .description("Porcentaje de ocupación de cada depósito")
+            .tag("modulo", "logistica")
+            .register(meterRegistry);
 
     this.asignacionesCreadas =
             Counter.builder("logistica.asignaciones.creadas")
@@ -201,6 +217,20 @@ public class MetricasService {
             .tag("resultado", resultado)
             .register(meterRegistry)
             .increment();
+  }
+
+  // Refresca el gauge de ocupacion por deposito: una fila por deposito que exista ahora
+  // (overwrite = true borra las filas de depositos eliminados).
+  @Scheduled(fixedDelay = 10000, initialDelay = 10000)
+  public void actualizarOcupacionPorDeposito() {
+    try {
+      List<MultiGauge.Row<?>> filas = new ArrayList<>();
+      logisticaService.ocupacionPorDeposito()
+              .forEach((deposito, porcentaje) -> filas.add(MultiGauge.Row.of(Tags.of("deposito", deposito), porcentaje)));
+      ocupacionPorDeposito.register(filas, true);
+    } catch (Exception e) {
+      log.debug("No se pudo actualizar la ocupacion por deposito: {}", e.getMessage());
+    }
   }
 
   // Fuente de los gauges de cola: se le pregunta al broker cuántos mensajes hay.

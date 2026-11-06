@@ -906,6 +906,20 @@ public class LogisticaService implements Logistica_Interface, Donaciones_Interfa
                 .sum();
     }
 
+    // Gauge de ocupacion por deposito (0 a 100), para la alarma "Deposito casi lleno"
+    public Map<String, Double> ocupacionPorDeposito() {
+        Map<String, Double> ocupacion = new LinkedHashMap<>();
+        for (Deposito d : depositoRepository.findAll()) {
+            Integer cap = d.getCapacidadMaxima();
+            if (cap == null || cap == 0) {
+                continue; // evita división por cero
+            }
+            int stock = d.getStockActual() != null ? d.getStockActual() : 0;
+            ocupacion.put(d.getId(), (stock * 100.0) / cap);
+        }
+        return ocupacion;
+    }
+
     //Gauge ocupacion promedio
     public double ocupacionPromedio() {
         var depositos = depositoRepository.findAll();
